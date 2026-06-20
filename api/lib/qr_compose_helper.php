@@ -153,14 +153,26 @@ function wm_qr_compose(string $text, int $size, string $logoUrl, string $themeHe
        specific deployment surfaces scan failures we walk back in 5%
        steps (45 -> 40 -> 35 -> 30).
        Pad ratio reduced from 0.12 to 0.06 so the padding ring around
-       the logo doesn't balloon proportionally. */
+       the logo doesn't balloon proportionally.
+
+       2026-06-21 (Marty) -- 0.45 was the FAILED bump that produced
+       a logo so big the QR no longer scanned on any phone. ecLevel H
+       recovers ~30% of obscured area when that area is a single
+       solid colour the scanner can identify and ignore. 0.45 logo
+       width with a 6% pad ring = ~48% obscured footprint, well past
+       the recovery envelope.
+       Reverted to a tested 0.25 logo with a more generous 0.10 pad
+       (visible footprint ~30%) which scans reliably across every
+       phone we've tested. This is the realistic ceiling for a
+       centre-logo QR; bigger requires printing the QR larger
+       overall, not bumping the logo proportion. */
     $qrW   = imagesx($qrImg);
     $qrH   = imagesy($qrImg);
     $logoW = imagesx($logoImg);
     $logoH = imagesy($logoImg);
 
-    $target = (int) round($qrW * 0.45);
-    $pad    = (int) round($target * 0.06);
+    $target = (int) round($qrW * 0.25);
+    $pad    = (int) round($target * 0.10);
 
     /* Preserve logo aspect ratio. */
     if ($logoH > $logoW) {
