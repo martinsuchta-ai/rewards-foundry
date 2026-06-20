@@ -59,9 +59,11 @@ if (!function_exists('wm_qr_compose')) :
    box rendered them invisible -- this lets callers pass the
    client's brand primary instead so the logo pops. Invalid hex
    falls back to white. */
-function wm_qr_compose(string $text, int $size, string $logoUrl, string $themeHex = '#FFFFFF'): array
+function wm_qr_compose(string $text, int $size, string $logoUrl, string $themeHex = '#FFFFFF', string $style = 'centered'): array
 {
     $size = max(120, min(1024, $size));
+    $style = strtolower(trim($style));
+    if (!in_array($style, ['centered', 'watermark'], true)) $style = 'centered';
 
     /* ── 1. Fetch the QR from quickchart ──────────────────────
        ecLevel=H only when we're embedding a logo — gives ~30%
@@ -171,6 +173,77 @@ function wm_qr_compose(string $text, int $size, string $logoUrl, string $themeHe
     $logoW = imagesx($logoImg);
     $logoH = imagesy($logoImg);
 
+    /* ── 3b. Watermark style ──────────────────────────────────
+       Marty 2026-06-21 -- experimental alternative to the centred
+       logo. Resize the logo to ~70% of QR width, fade it heavily
+       (alpha ~0.29 of opaque), centre-paste over the QR with no
+       padding box. Scanner reads the QR through the faded logo
+       because dark-on-dark stays dark, light-on-light stays light;
+       only mid-tone pixels at the logo edges shift slightly.
+       Toggled by ?style=watermark at the endpoint level. */
+    if ($style === 'watermark') {
+        $wmTarget = (int) round($qrW * 0.70);
+        if ($logoH > $logoW) {
+            $wmH = $wmTarget;
+            $wmW = max(1, (int) round($wmTarget * ($logoW / $logoH)));
+        } else {
+            $wmW = $wmTarget;
+            $wmH = max(1, (int) round($wmTarget * ($logoH / $logoW)));
+        }
+
+        $wmScaled = imagecreatetruecolor($wmW, $wmH);
+        imagesavealpha($wmScaled, true);
+        imagealphablending($wmScaled, false);
+        $wmTransp = imagecolorallocatealpha($wmScaled, 0, 0, 0, 127);
+        imagefilledrectangle($wmScaled, 0, 0, $wmW - 1, $wmH - 1, $wmTransp);
+        imagealphablending($wmScaled, true);
+        @imagecopyresampled($wmScaled, $logoImg, 0, 0, 0, 0, $wmW, $wmH, $logoW, $logoH);
+
+        /* Fade by manipulating per-pixel alpha. Alpha 90 on a GD
+           scale of 0=opaque..127=transparent yields ~0.29 visible
+           opacity. */
+        $wmFade = 90;
+        for ($y = 0; $y < $wmH; $y++) {
+            for ($x = 0; $x < $wmW; $x++) {
+                $rgba = imagecolorat($wmScaled, $x, $y);
+                $a = ($rgba >> 24) & 0x7F;
+                if ($a === 127) continue;
+                $newA = min(127, $a + $wmFade);
+                $r = ($rgba >> 16) & 0xFF;
+                $g = ($rgba >>  8) & 0xFF;
+                $b =  $rgba        & 0xFF;
+                $faded = imagecolorallocatealpha($wmScaled, $r, $g, $b, $newA);
+                imagesetpixel($wmScaled, $x, $y, $faded);
+            }
+        }
+
+        $wmX = (int) (($qrW - $wmW) / 2);
+        $wmY = (int) (($qrH - $wmH) / 2);
+        imagealphablending($qrImg, true);
+        @imagecopy($qrImg, $wmScaled, $wmX, $wmY, 0, 0, $wmW, $wmH);
+
+        ob_start();
+        imagepng($qrImg);
+        $finalPng = ob_get_clean();
+
+        imagedestroy($qrImg);
+        imagedestroy($logoImg);
+        imagedestroy($wmScaled);
+
+        if (!$finalPng || strlen($finalPng) < 64 || substr($finalPng, 0, 8) !== $pngMagic) {
+            return $plainResult + ['fallback_reason' => 'encode_failed'];
+        }
+        return [
+            'ok'              => true,
+            'png'             => $finalPng,
+            'error'           => null,
+            'composited'      => true,
+            'fallback_reason' => null,
+            'style'           => 'watermark',
+        ];
+    }
+
+    /* ── 3a. Centred logo (default) ─────────────────────────── */
     $target = (int) round($qrW * 0.25);
     $pad    = (int) round($target * 0.10);
 

@@ -69,7 +69,14 @@ $themeHex = trim((string) ($row['theme_primary_hex'] ?? '')) ?: '#FFFFFF';
 $logoUrl  = trim((string) ($row['logo_url']          ?? ''));
 
 require_once __DIR__ . '/../lib/qr_compose_helper.php';
-$result = wm_qr_compose($publicUrl, $size, $logoUrl, $themeHex);
+
+/* 2026-06-21 — Marty: A/B preview of a "watermark"-style logo
+   composition (full-width logo at ~30% opacity over the QR vs
+   the current centered logo). Toggled via ?style=watermark.
+   Default stays 'centered' so existing surfaces are unchanged. */
+$style = isset($_GET['style']) ? (string) $_GET['style'] : 'centered';
+
+$result = wm_qr_compose($publicUrl, $size, $logoUrl, $themeHex, $style);
 
 if (!$result['ok'] || empty($result['png'])) {
     @error_log('[rewards.qr] compose failed for token ' . substr($token, 0, 8)
