@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>Rewards Foundry · Admin</title>
+<link rel="stylesheet" href="/admin/style.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand"><span class="brand-mark">Rewards</span> Foundry · Admin</div>
+  <div class="topbar-right">
+    <span class="who" id="topbar-who"></span>
+    <button class="btn btn-sm" id="topbar-logout">Sign out</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-tab="items">Items</button>
+  <button class="tab"        data-tab="redemptions">Redemptions</button>
+  <button class="tab"        data-tab="consumers">Consumers</button>
+</div>
+
+<div class="main">
+
+  <!-- ── ITEMS TAB ─────────────────────────────────────────────── -->
+  <div data-pane="items">
+    <div class="filterbar">
+      <label>Consumer</label>
+      <select id="items-f-consumer"><option value="">All</option></select>
+      <label>Sub ID</label>
+      <input  id="items-f-sub" type="text" placeholder="SUB-XXX" style="width:180px">
+      <label><input type="checkbox" id="items-f-inactive"> include inactive</label>
+      <button class="btn btn-sm"         id="items-refresh">Refresh</button>
+      <span style="flex:1 1 auto"></span>
+      <button class="btn btn-primary btn-sm" id="items-new">+ New item</button>
+    </div>
+    <div class="panel">
+      <div id="items-list-host">
+        <div style="padding:16px;color:var(--text-muted);font-style:italic">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── REDEMPTIONS TAB ──────────────────────────────────────── -->
+  <div data-pane="redemptions" style="display:none">
+    <div class="kpi-row" id="redemptions-kpi-host" style="margin-bottom:14px"></div>
+    <div class="filterbar">
+      <label>Consumer</label>
+      <select id="red-f-consumer"><option value="">All</option></select>
+      <label>Sub ID</label>
+      <input  id="red-f-sub" type="text" placeholder="SUB-XXX" style="width:180px">
+      <label>From</label>
+      <input  id="red-f-from" type="date">
+      <label>To</label>
+      <input  id="red-f-to"   type="date">
+      <button class="btn btn-sm"         id="red-refresh">Refresh</button>
+      <span style="flex:1 1 auto"></span>
+      <button class="btn btn-sm" id="red-csv">Export CSV</button>
+    </div>
+    <div class="panel">
+      <div id="red-list-host">
+        <div style="padding:16px;color:var(--text-muted);font-style:italic">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CONSUMERS TAB ─────────────────────────────────────────── -->
+  <div data-pane="consumers" style="display:none">
+    <div class="panel">
+      <div class="panel-h">API consumers</div>
+      <div id="consumers-list-host">
+        <div style="padding:16px;color:var(--text-muted);font-style:italic">Loading…</div>
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:12px">
+        To mint a new consumer or rotate an existing key, run
+        <code class="mono">api/bootstrap_consumer_key.php</code> with
+        the migrate token. (UI promotion deferred until there's a
+        second consumer to manage.)
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── ITEM EDITOR MODAL ─────────────────────────────────────── -->
+<div class="modal-bg" id="item-modal-bg">
+  <div class="modal">
+    <div class="modal-h" id="item-modal-h">New reward item</div>
+    <div class="form-grid">
+      <div class="form-row full">
+        <label>Name *</label>
+        <input id="im-name" type="text">
+      </div>
+      <div class="form-row">
+        <label>Consumer *</label>
+        <select id="im-consumer"></select>
+      </div>
+      <div class="form-row">
+        <label>Sub ID *</label>
+        <input id="im-sub" type="text" placeholder="SUB-XXX">
+      </div>
+      <div class="form-row full">
+        <label>Location</label>
+        <input id="im-location" type="text" placeholder="Coffee shop, Level 3 etc.">
+      </div>
+      <div class="form-row">
+        <label>Points</label>
+        <input id="im-points" type="number" value="0">
+      </div>
+      <div class="form-row">
+        <label>Value / point</label>
+        <input id="im-value" type="number" step="0.0001" value="0">
+      </div>
+      <div class="form-row">
+        <label>Currency</label>
+        <input id="im-currency" type="text" value="AUD" maxlength="3" style="text-transform:uppercase">
+      </div>
+      <div class="form-row">
+        <label>Max redemptions / person</label>
+        <input id="im-cap" type="number" placeholder="leave blank for unlimited">
+      </div>
+      <div class="form-row">
+        <label>Theme primary (hex)</label>
+        <input id="im-theme" type="text" placeholder="#e8621a">
+      </div>
+      <div class="form-row">
+        <label>Logo URL</label>
+        <input id="im-logo" type="text" placeholder="https://...">
+      </div>
+      <div class="form-row full">
+        <label><input type="checkbox" id="im-active" checked> active</label>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <span style="flex:1 1 auto;color:var(--red);font-size:12px" id="im-err"></span>
+      <button class="btn"             id="im-cancel">Cancel</button>
+      <button class="btn btn-primary" id="im-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="/admin/shell.js"></script>
+<script>
+(function () {
+  /* ── Tabs ─────────────────────────────────────────────────── */
+  var tabs = document.querySelectorAll('.tab');
+  var panes = document.querySelectorAll('[data-pane]');
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () {
+      tabs.forEach(function (x) { x.classList.remove('active'); });
+      t.classList.add('active');
+      var tab = t.getAttribute('data-tab');
+      panes.forEach(function (p) {
+        p.style.display = (p.getAttribute('data-pane') === tab) ? '' : 'none';
+      });
+      if (tab === 'items')       loadItems();
+      if (tab === 'redemptions') loadRedemptions();
+      if (tab === 'consumers')   loadConsumers();
+    });
+  });
+
+  /* ── Auth gate ────────────────────────────────────────────── */
+  RF.requireSession(function (profile) {
+    document.getElementById('topbar-who').textContent =
+      (profile.name || profile.email || 'admin');
+    /* Populate consumers dropdowns once on load. */
+    refreshConsumerDropdowns().then(function () {
+      loadItems();
+    });
+  });
+  document.getElementById('topbar-logout').addEventListener('click', RF.logout);
+
+  /* ── Consumer dropdowns ───────────────────────────────────── */
+  var CONSUMERS = [];
+  function refreshConsumerDropdowns() {
+    return RF.api('/api/admin/consumers.php?action=list').then(function (res) {
+      if (!res.body || !res.body.ok) return;
+      CONSUMERS = res.body.consumers || [];
+      var html = '<option value="">All</option>' + CONSUMERS.map(function (c) {
+        return '<option value="' + c.id + '">' + RF.esc(c.name) + '</option>';
+      }).join('');
+      document.getElementById('items-f-consumer').innerHTML = html;
+      document.getElementById('red-f-consumer').innerHTML   = html;
+      /* Modal picker — required, so no "All" option. */
+      var modalHtml = CONSUMERS.map(function (c) {
+        return '<option value="' + c.id + '">' + RF.esc(c.name) + '</option>';
+      }).join('');
+      document.getElementById('im-consumer').innerHTML = modalHtml;
+    });
+  }
+
+  /* ── ITEMS ────────────────────────────────────────────────── */
+  function loadItems() {
+    var host = document.getElementById('items-list-host');
+    host.innerHTML = '<div style="padding:16px;color:var(--text-muted);font-style:italic">Loading…</div>';
+    var qs = [];
+    var cid = document.getElementById('items-f-consumer').value;
+    var sub = document.getElementById('items-f-sub').value.trim();
+    if (cid) qs.push('consumer_id=' + encodeURIComponent(cid));
+    if (sub) qs.push('sub_id=' + encodeURIComponent(sub));
+    if (document.getElementById('items-f-inactive').checked) qs.push('include_inactive=1');
+    qs.push('action=list');
+
+    RF.api('/api/admin/items.php?' + qs.join('&')).then(function (res) {
+      if (!res.body || !res.body.ok) {
+        host.innerHTML = '<div style="padding:16px;color:var(--red)">Load failed: ' + RF.esc(res.body && res.body.error || 'unknown') + '</div>';
+        return;
+      }
+      var items = res.body.items || [];
+      if (!items.length) {
+        host.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted);font-style:italic">No items match the filter.</div>';
+        return;
+      }
+      var rows = items.map(function (it) {
+        return '<tr>'
+          + '<td><strong>' + RF.esc(it.name) + '</strong>'
+          + (it.location ? '<div style="font-size:11px;color:var(--text-muted)">' + RF.esc(it.location) + '</div>' : '')
+          + '</td>'
+          + '<td>' + RF.esc(it.consumer_name) + '</td>'
+          + '<td><span class="mono">' + RF.esc(it.sub_id) + '</span></td>'
+          + '<td>' + RF.esc(it.points_allocated) + '</td>'
+          + '<td>' + RF.esc(it.currency) + ' ' + (parseFloat(it.money_value_per_point) * parseInt(it.points_allocated, 10)).toFixed(2) + '</td>'
+          + '<td>' + RF.esc(it.redemption_count) + (it.max_redemptions_per_person != null ? ' / ' + RF.esc(it.max_redemptions_per_person) : '') + '</td>'
+          + '<td>' + (parseInt(it.is_active, 10) ? '<span class="pill on">active</span>' : '<span class="pill off">inactive</span>') + '</td>'
+          + '<td style="white-space:nowrap">'
+          +   '<a class="btn btn-sm" href="' + RF.esc(it.public_url) + '" target="_blank">Open</a> '
+          +   '<a class="btn btn-sm" href="' + RF.esc(it.qr_png_url) + '" target="_blank">QR</a> '
+          +   '<button class="btn btn-sm" data-edit="' + it.id + '">Edit</button> '
+          + (parseInt(it.is_active, 10) ? '<button class="btn btn-sm btn-danger" data-del="' + it.id + '">Disable</button>' : '')
+          + '</td>'
+          + '</tr>';
+      }).join('');
+      host.innerHTML = '<table class="tbl"><thead><tr>'
+        + '<th>Name</th><th>Consumer</th><th>Sub</th><th>Pts</th><th>Value</th>'
+        + '<th>Redeemed</th><th>Status</th><th></th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table>';
+      host.querySelectorAll('[data-edit]').forEach(function (b) {
+        b.addEventListener('click', function () { openItemModal(parseInt(b.getAttribute('data-edit'), 10)); });
+      });
+      host.querySelectorAll('[data-del]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!confirm('Disable this item? It can be re-enabled later.')) return;
+          RF.api('/api/admin/items.php?action=delete&id=' + b.getAttribute('data-del'),
+                 { method: 'POST' }).then(loadItems);
+        });
+      });
+    });
+  }
+  document.getElementById('items-refresh').addEventListener('click', loadItems);
+  document.getElementById('items-f-consumer').addEventListener('change', loadItems);
+  document.getElementById('items-f-sub').addEventListener('keydown', function (e) { if (e.key === 'Enter') loadItems(); });
+  document.getElementById('items-f-inactive').addEventListener('change', loadItems);
+  document.getElementById('items-new').addEventListener('click', function () { openItemModal(null); });
+
+  /* ── Item modal ───────────────────────────────────────────── */
+  var EDIT_ID = null;
+  function openItemModal(id) {
+    EDIT_ID = id;
+    document.getElementById('item-modal-h').textContent = id ? 'Edit reward item' : 'New reward item';
+    document.getElementById('im-err').textContent = '';
+    if (id) {
+      RF.api('/api/admin/items.php?action=get&id=' + id).then(function (res) {
+        if (!res.body || !res.body.ok) {
+          document.getElementById('im-err').textContent = (res.body && res.body.error) || 'load failed';
+          return;
+        }
+        var it = res.body.item;
+        document.getElementById('im-name').value     = it.name || '';
+        document.getElementById('im-consumer').value = it.consumer_id;
+        document.getElementById('im-sub').value      = it.sub_id || '';
+        document.getElementById('im-location').value = it.location || '';
+        document.getElementById('im-points').value   = it.points_allocated || 0;
+        document.getElementById('im-value').value    = it.money_value_per_point || 0;
+        document.getElementById('im-currency').value = it.currency || 'AUD';
+        document.getElementById('im-cap').value      = it.max_redemptions_per_person == null ? '' : it.max_redemptions_per_person;
+        document.getElementById('im-theme').value    = it.theme_primary_hex || '';
+        document.getElementById('im-logo').value     = it.logo_url || '';
+        document.getElementById('im-active').checked = parseInt(it.is_active, 10) === 1;
+        document.getElementById('im-consumer').disabled = true;
+        document.getElementById('im-sub').disabled      = true;
+      });
+    } else {
+      document.getElementById('im-name').value     = '';
+      if (CONSUMERS.length) document.getElementById('im-consumer').value = CONSUMERS[0].id;
+      document.getElementById('im-sub').value      = '';
+      document.getElementById('im-location').value = '';
+      document.getElementById('im-points').value   = 0;
+      document.getElementById('im-value').value    = 0;
+      document.getElementById('im-currency').value = 'AUD';
+      document.getElementById('im-cap').value      = '';
+      document.getElementById('im-theme').value    = '';
+      document.getElementById('im-logo').value     = '';
+      document.getElementById('im-active').checked = true;
+      document.getElementById('im-consumer').disabled = false;
+      document.getElementById('im-sub').disabled      = false;
+    }
+    document.getElementById('item-modal-bg').classList.add('open');
+  }
+  document.getElementById('im-cancel').addEventListener('click', function () {
+    document.getElementById('item-modal-bg').classList.remove('open');
+  });
+  document.getElementById('im-save').addEventListener('click', function () {
+    var body = {
+      name: document.getElementById('im-name').value.trim(),
+      consumer_id: parseInt(document.getElementById('im-consumer').value, 10),
+      sub_id: document.getElementById('im-sub').value.trim(),
+      location: document.getElementById('im-location').value.trim() || null,
+      points_allocated: parseInt(document.getElementById('im-points').value, 10) || 0,
+      money_value_per_point: parseFloat(document.getElementById('im-value').value) || 0,
+      currency: document.getElementById('im-currency').value.trim().toUpperCase() || 'AUD',
+      max_redemptions_per_person: document.getElementById('im-cap').value === '' ? null : parseInt(document.getElementById('im-cap').value, 10),
+      theme_primary_hex: document.getElementById('im-theme').value.trim() || null,
+      logo_url: document.getElementById('im-logo').value.trim() || null,
+      is_active: document.getElementById('im-active').checked ? 1 : 0,
+    };
+    var url = EDIT_ID
+      ? '/api/admin/items.php?action=update&id=' + EDIT_ID
+      : '/api/admin/items.php?action=create';
+    document.getElementById('im-err').textContent = 'Saving…';
+    RF.api(url, { method: 'POST', body: JSON.stringify(body) }).then(function (res) {
+      if (!res.body || !res.body.ok) {
+        document.getElementById('im-err').textContent = (res.body && res.body.error) || 'save failed';
+        return;
+      }
+      document.getElementById('item-modal-bg').classList.remove('open');
+      loadItems();
+    });
+  });
+
+  /* ── REDEMPTIONS ──────────────────────────────────────────── */
+  function loadRedemptions() {
+    var host = document.getElementById('red-list-host');
+    var kpiHost = document.getElementById('redemptions-kpi-host');
+    host.innerHTML = '<div style="padding:16px;color:var(--text-muted);font-style:italic">Loading…</div>';
+    var qs = filterQs();
+
+    /* Fetch summary + list in parallel. */
+    Promise.all([
+      RF.api('/api/admin/redemptions.php?action=summary&' + qs),
+      RF.api('/api/admin/redemptions.php?action=list&'    + qs),
+    ]).then(function (results) {
+      var s = (results[0].body && results[0].body.ok) ? results[0].body : null;
+      var l = (results[1].body && results[1].body.ok) ? results[1].body : null;
+
+      if (s) {
+        kpiHost.innerHTML = ''
+          + '<div class="kpi"><div class="kpi-l">Total redemptions</div><div class="kpi-v">' + s.total_redemptions + '</div></div>'
+          + '<div class="kpi"><div class="kpi-l">Unique redeemers</div><div class="kpi-v">' + s.unique_redeemers + '</div></div>'
+          + '<div class="kpi"><div class="kpi-l">Total points</div><div class="kpi-v">' + s.total_points + '</div></div>'
+          + (s.by_currency || []).map(function (r) {
+              return '<div class="kpi"><div class="kpi-l">Value (' + RF.esc(r.currency || '—') + ')</div><div class="kpi-v">' + parseFloat(r.money_sum || 0).toFixed(2) + '</div><div class="kpi-sub">' + r.n + ' redemptions</div></div>';
+            }).join('');
+      }
+
+      if (!l || !l.redemptions || !l.redemptions.length) {
+        host.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted);font-style:italic">No redemptions match the filter.</div>';
+        return;
+      }
+      var rows = l.redemptions.map(function (r) {
+        var ident = r.redeemer_email ? RF.esc(r.redeemer_email)
+                  : (r.redeemer_key ? '<span class="mono">key:' + RF.esc(r.redeemer_key) + '</span>' : '—');
+        return '<tr>'
+          + '<td>' + RF.esc(RF.fmtDate(r.redeemed_at)) + '</td>'
+          + '<td>' + RF.esc(r.consumer_name) + '</td>'
+          + '<td>' + RF.esc(r.item_name) + '</td>'
+          + '<td><span class="mono">' + RF.esc(r.sub_id) + '</span></td>'
+          + '<td>' + ident + '</td>'
+          + '<td>' + RF.esc(r.points_awarded || '') + '</td>'
+          + '<td>' + RF.esc(r.currency || '') + ' ' + (parseFloat(r.money_value || 0)).toFixed(2) + '</td>'
+          + '</tr>';
+      }).join('');
+      host.innerHTML = '<table class="tbl"><thead><tr>'
+        + '<th>When (UTC)</th><th>Consumer</th><th>Item</th><th>Sub</th>'
+        + '<th>Redeemer</th><th>Pts</th><th>Value</th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table>';
+    });
+  }
+  function filterQs() {
+    var qs = [];
+    var cid = document.getElementById('red-f-consumer').value;
+    var sub = document.getElementById('red-f-sub').value.trim();
+    var fr  = document.getElementById('red-f-from').value;
+    var to  = document.getElementById('red-f-to').value;
+    if (cid) qs.push('consumer_id=' + encodeURIComponent(cid));
+    if (sub) qs.push('sub_id=' + encodeURIComponent(sub));
+    if (fr)  qs.push('from=' + encodeURIComponent(fr));
+    if (to)  qs.push('to='   + encodeURIComponent(to));
+    return qs.join('&');
+  }
+  document.getElementById('red-refresh').addEventListener('click', loadRedemptions);
+  document.getElementById('red-csv').addEventListener('click', function () {
+    /* Direct browser download — credentials: 'include' carries the
+       cookie; the X-Admin-Session header isn't sent on plain link
+       clicks but the cookie alone is enough for the admin gate. */
+    window.location.href = '/api/admin/redemptions.php?action=csv&' + filterQs();
+  });
+
+  /* ── CONSUMERS ────────────────────────────────────────────── */
+  function loadConsumers() {
+    var host = document.getElementById('consumers-list-host');
+    RF.api('/api/admin/consumers.php?action=list').then(function (res) {
+      if (!res.body || !res.body.ok) {
+        host.innerHTML = '<div style="padding:16px;color:var(--red)">load failed</div>';
+        return;
+      }
+      var c = res.body.consumers || [];
+      if (!c.length) { host.innerHTML = '<em>no consumers</em>'; return; }
+      var rows = c.map(function (x) {
+        return '<tr>'
+          + '<td><strong>' + RF.esc(x.name) + '</strong></td>'
+          + '<td>' + RF.esc(x.cors_origin || '—') + '</td>'
+          + '<td>' + (parseInt(x.active, 10) ? '<span class="pill on">active</span>' : '<span class="pill off">inactive</span>') + '</td>'
+          + '<td>' + RF.esc(x.item_count) + '</td>'
+          + '<td>' + RF.esc(x.redemption_count) + '</td>'
+          + '<td>' + RF.esc(RF.fmtDate(x.created_at)) + '</td>'
+          + '</tr>';
+      }).join('');
+      host.innerHTML = '<table class="tbl"><thead><tr>'
+        + '<th>Name</th><th>CORS origin</th><th>Status</th>'
+        + '<th>Items</th><th>Redemptions</th><th>Created</th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table>';
+    });
+  }
+})();
+</script>
+</body>
+</html>

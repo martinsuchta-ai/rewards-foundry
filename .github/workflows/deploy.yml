@@ -25,19 +25,21 @@ jobs:
         # the Affiliate + TGF setups. Use ftp:// + force SSL via lftp
         # directives.
         #
-        # Mirror source: ./public/ + ./app/ + ./api/
-        #   → /rewards-foundry.com/rewards-foundry.com/public_html/  (addon-domain webroot)
+        # Mirror source: ./public/ + ./api/
+        #   → /rewards-foundry.com/public_html/  (addon-domain webroot)
         #
-        # NOTE on target path: if SG provisioned rewards-foundry.com as
-        # an addon domain on an existing account, the webroot is
-        # /rewards-foundry.com/rewards-foundry.com/public_html/. If it's the account's
-        # PRIMARY domain (created as a fresh account), it's just
-        # /rewards-foundry.com/public_html/. The TGF deploy started wrong (account-root
-        # vs addon-webroot) and had to be fixed mid-flight — check
-        # via FileZilla which one applies BEFORE blaming the workflow.
+        # NOTE on target path: rewards-foundry.com is an addon domain
+        # on Marty's primary SG account, so the webroot is
+        # /rewards-foundry.com/public_html/. If anyone re-runs this
+        # on a fresh stand-alone account (primary domain), the webroot
+        # would be /public_html/ instead. Check via FileZilla BEFORE
+        # blaming the workflow.
         #
-        # Three top-level dirs ship: public (static + redeem.html),
-        # app (admin UI shell), api (PHP endpoints + migrations).
+        # Two top-level dirs ship: public/ (static + redeem.html + the
+        # admin UI under public/admin/) and api/ (PHP endpoints +
+        # migrations). app/ was scaffolded as a placeholder but admin-
+        # under-public gives cleaner URLs (/admin/login vs /app/admin/login),
+        # so the mirror skips it.
         run: |
           lftp -d -e "
             set ftp:ssl-force yes;
@@ -54,9 +56,6 @@ jobs:
               -X CLAUDE.md \
               -X .gitignore \
               ./public/ /rewards-foundry.com/public_html/;
-            mirror -R --no-perms --delete --verbose \
-              -X .git/ -X .github/ -X .vscode/ -X .claude/ \
-              ./app/ /rewards-foundry.com/public_html/app/;
             mirror -R --no-perms --delete --verbose \
               -X .git/ -X .github/ -X .vscode/ -X .claude/ \
               ./api/ /rewards-foundry.com/public_html/api/;
