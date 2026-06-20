@@ -26,13 +26,13 @@ jobs:
         # directives.
         #
         # Mirror source: ./public/ + ./app/ + ./api/
-        #   → /rewards-foundry.com/public_html/  (addon-domain webroot)
+        #   → /rewards-foundry.com/rewards-foundry.com/public_html/  (addon-domain webroot)
         #
         # NOTE on target path: if SG provisioned rewards-foundry.com as
         # an addon domain on an existing account, the webroot is
-        # /rewards-foundry.com/public_html/. If it's the account's
+        # /rewards-foundry.com/rewards-foundry.com/public_html/. If it's the account's
         # PRIMARY domain (created as a fresh account), it's just
-        # /public_html/. The TGF deploy started wrong (account-root
+        # /rewards-foundry.com/public_html/. The TGF deploy started wrong (account-root
         # vs addon-webroot) and had to be fixed mid-flight — check
         # via FileZilla which one applies BEFORE blaming the workflow.
         #
@@ -53,14 +53,14 @@ jobs:
               -X README.md \
               -X CLAUDE.md \
               -X .gitignore \
-              ./public/ /public_html/;
+              ./public/ /rewards-foundry.com/public_html/;
             mirror -R --no-perms --delete --verbose \
               -X .git/ -X .github/ -X .vscode/ -X .claude/ \
-              ./app/ /public_html/app/;
+              ./app/ /rewards-foundry.com/public_html/app/;
             mirror -R --no-perms --delete --verbose \
               -X .git/ -X .github/ -X .vscode/ -X .claude/ \
-              ./api/ /public_html/api/;
+              ./api/ /rewards-foundry.com/public_html/api/;
             pwd;
-            cls -la /public_html/;
+            cls -la /rewards-foundry.com/public_html/;
             bye
           "
