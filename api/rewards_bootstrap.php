@@ -18,16 +18,35 @@ declare(strict_types=1);
 date_default_timezone_set('UTC');
 
 /* ── Locate and load rewards_secrets.php ────────────────────────────
-   Lives ABOVE the webroot at /home/customer/www/rewards-foundry.com/
-   rewards_secrets.php. Try a few candidate paths so local-dev /
-   different SG account layouts both work. */
+   Lives ABOVE the webroot. Layout varies by SG account type:
+
+   PRIMARY-domain layout (rewards-foundry.com IS the primary account):
+     webroot:  /home/customer/www/rewards-foundry.com/public_html/
+     secrets:  /home/customer/www/rewards-foundry.com/rewards_secrets.php
+     from api/file.php: ../../rewards_secrets.php
+
+   ADDON-domain layout (rewards-foundry.com is an addon on smart-
+   tools-foundry.com):
+     webroot:  /home/customer/www/smart-tools-foundry.com/rewards-foundry.com/public_html/
+     secrets:  /home/customer/www/smart-tools-foundry.com/rewards-foundry.com/rewards_secrets.php
+     from api/file.php: ../../rewards_secrets.php   (same relative path!)
+
+   Both layouts have the secrets file two directories up from api/
+   files (above the webroot, inside the domain's home dir). The
+   relative path `../../rewards_secrets.php` works for BOTH.
+
+   Below: relative path first, then explicit-absolute fallbacks for
+   both layout types. If none match, run /api/_diag.php?secrets_probe=1
+   to see which candidate paths exist on disk. */
 $_rewards_secrets_candidates = [
-    /* SG addon-domain layout (webroot = /rewards-foundry.com/public_html/) */
-    __DIR__ . '/../../../rewards_secrets.php',
-    /* SG primary-domain layout (webroot = /public_html/) */
     __DIR__ . '/../../rewards_secrets.php',
-    /* Explicit SG path (belt-and-braces) */
+    /* Belt-and-braces absolute paths for the two common SG layouts: */
     '/home/customer/www/rewards-foundry.com/rewards_secrets.php',
+    '/home/customer/www/smart-tools-foundry.com/rewards-foundry.com/rewards_secrets.php',
+    /* Legacy "one more level up" guesses in case symlinks land us
+       somewhere unexpected. */
+    __DIR__ . '/../../../rewards_secrets.php',
+    __DIR__ . '/../rewards_secrets.php',
 ];
 foreach ($_rewards_secrets_candidates as $_path) {
     if (is_file($_path) && is_readable($_path)) {

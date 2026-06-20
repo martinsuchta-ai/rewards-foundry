@@ -23,6 +23,48 @@ require_once __DIR__ . '/db.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
+/* 2026-06-21 -- before the cron-auth check (which 403s on token
+   mismatch / missing-token), expose which secrets-file candidate
+   paths exist on disk + whether any matched what rewards_bootstrap
+   tried to load. Without this, a misplaced rewards_secrets.php is
+   invisible: every endpoint just 403s on a "missing token" that's
+   actually "secret never loaded".
+
+   This block runs WITHOUT auth so a fresh deploy can self-diagnose
+   the secrets path even before the token is valid. It only prints
+   boolean presence + path strings -- no secret values. */
+if (isset($_GET['secrets_probe']) && $_GET['secrets_probe'] === '1') {
+    $candidates = [
+        '__DIR__/../../../rewards_secrets.php'                          => __DIR__ . '/../../../rewards_secrets.php',
+        '__DIR__/../../rewards_secrets.php'                             => __DIR__ . '/../../rewards_secrets.php',
+        '/home/customer/www/rewards-foundry.com/rewards_secrets.php'    => '/home/customer/www/rewards-foundry.com/rewards_secrets.php',
+        '/home/customer/www/smart-tools-foundry.com/rewards-foundry.com/rewards_secrets.php'
+                                                                        => '/home/customer/www/smart-tools-foundry.com/rewards-foundry.com/rewards_secrets.php',
+        '/home/customer/www/smart-tools-foundry.com/rewards_secrets.php'
+                                                                        => '/home/customer/www/smart-tools-foundry.com/rewards_secrets.php',
+    ];
+    $probe = [];
+    foreach ($candidates as $label => $path) {
+        $real = @realpath($path);
+        $probe[] = [
+            'candidate'    => $label,
+            'resolved_to'  => $real ?: $path,
+            'exists'       => is_file($path),
+            'readable'     => is_file($path) && is_readable($path),
+        ];
+    }
+    echo json_encode([
+        'ok'                  => true,
+        'secrets_probe'       => true,
+        'time_utc'            => gmdate('c'),
+        '__DIR__'             => __DIR__,
+        'candidates'          => $probe,
+        'any_env_loaded'      => (getenv('REWARDS_DB_HOST') !== false && getenv('REWARDS_DB_HOST') !== ''),
+        'note'                => 'Authentication bypassed for this probe-only mode. Remove ?secrets_probe=1 once you have located the file path.',
+    ], JSON_PRETTY_PRINT);
+    exit;
+}
+
 rewards_cron_auth_check();
 
 $out = [
