@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Redeem your reward · Wellbeing Matters</title>
+<link rel="icon" href="https://smart-tools-foundry.com/TGF/assets/TGFIconcolor.png">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  /* --brand is the per-client primary colour. Defaults to WBM
+     orange; overridden at runtime once the client lookup resolves
+     via the inline `data-brand` style applied to <body>. Every
+     brand-coloured surface below references --brand, NOT --orange,
+     so theming a non-WBM client only needs the variable swap. */
+  --brand:       #e8621a;
+  --brand-dark:  #b84a10;
+  --brand-pale:  rgba(232,98,26,.08);
+  --brand-ring:  rgba(232,98,26,.10);
+  --orange:      var(--brand);
+  --orange-dark: var(--brand-dark);
+  --orange-pale: var(--brand-pale);
+  --green:       #18a36e;
+  --punch:       #ec008b;
+  --bg:          #f4f6fb;
+  --card:        #ffffff;
+  --border:      rgba(28,43,58,.10);
+  --text:        #1c2b3a;
+  --text-mid:    #4a5f72;
+  --text-muted:  #8097ad;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { min-height: 100%; }
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: linear-gradient(135deg, #f4f6fb 0%, #e8eef7 100%);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.55;
+  /* 2026-06-19 — Marty: "The Powered by The Good Foundry is to the
+     side. Make it at the bottom." Original flex centering treated
+     .card and .footer as sibling flex items, parking the footer to
+     the right of the card. Switched to flex-direction:column so the
+     card sits centred horizontally + the footer flows BELOW it. */
+  flex-direction: column;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+.card {
+  background: var(--card);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(28,43,58,.10);
+  width: 100%;
+  max-width: 440px;
+  overflow: hidden;
+}
+.card-hero {
+  padding: 28px 28px 0;
+  text-align: center;
+}
+.brand-tag {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: 14px;
+}
+.title {
+  font-size: 22px;
+  font-weight: 800;
+  margin-bottom: 6px;
+  letter-spacing: -.01em;
+}
+.subtitle {
+  font-size: 13px;
+  color: var(--text-mid);
+  margin-bottom: 22px;
+}
+.reward-summary {
+  background: var(--orange-pale);
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin: 0 28px 22px;
+  text-align: left;
+}
+.reward-summary .row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 0;
+  font-size: 13px;
+}
+.reward-summary .row .lbl { color: var(--text-mid); }
+.reward-summary .row .val { font-weight: 700; }
+.reward-summary .row.location .val { font-weight: 500; color: var(--text-mid); font-style: italic; }
+.reward-summary .points {
+  font-size: 28px; font-weight: 800; color: var(--orange);
+  text-align: center; margin-top: 6px; line-height: 1.2;
+}
+.reward-summary .value {
+  font-size: 12px; text-align: center; color: var(--text-mid);
+  margin-top: 2px;
+}
+.form-section { padding: 0 28px 28px; }
+.form-tabs {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px;
+}
+.tab-btn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-mid);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .15s;
+}
+.tab-btn:hover { border-color: var(--orange); color: var(--orange); }
+.tab-btn.active {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #fff;
+}
+.field {
+  display: flex; flex-direction: column; gap: 6px;
+  margin-bottom: 12px;
+}
+.field label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.field input {
+  font-family: inherit;
+  font-size: 15px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  outline: none;
+  color: var(--text);
+}
+.field input:focus { border-color: var(--orange); box-shadow: 0 0 0 3px rgba(232,98,26,.10); }
+.field input[type="text"] { text-transform: uppercase; letter-spacing: .12em; }
+.field input[type="email"] { text-transform: none; letter-spacing: 0; }
+.field-hint {
+  font-size: 11.5px; color: var(--text-muted); line-height: 1.45; margin-top: 4px;
+}
+.submit-btn {
+  display: block; width: 100%;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  background: var(--orange);
+  color: #fff;
+  border: none;
+  padding: 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: background .15s;
+}
+.submit-btn:hover { background: var(--orange-dark); }
+.submit-btn:disabled { background: var(--text-muted); cursor: not-allowed; }
+/* Client logo chip — 2026-06-19. Sits under the Rewards Foundry
+   tag. White tile with the brand colour as a 2px border so the
+   surface reads as "this is THEIR reward". 60px on mobile, 72px
+   on desktop. Hidden by default; .has-logo on .card-hero reveals. */
+.client-logo-chip {
+  /* 2026-06-19 — Marty: "Can you back the chip for logo with client
+     theme set not white?" Backed with var(--brand) so the chip
+     reads in the client's brand colour; logo inside renders on the
+     branded ground. Border kept for definition; padding stays so
+     the logo doesn't touch the edges. */
+  display: none;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 14px;
+  padding: 8px;
+  background: var(--brand);
+  border: 2px solid var(--brand-dark, var(--brand));
+  border-radius: 18px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+}
+.card-hero.has-logo .client-logo-chip { display: flex; }
+.client-logo-chip img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.client-name-line {
+  display: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand);
+  letter-spacing: .04em;
+  margin: -6px 0 14px;
+  text-align: center;
+}
+.card-hero.has-client .client-name-line { display: block; }
+
+/* Mobile polish — sub-440px viewports get tighter padding + a
+   single-column tab pair that doesn't squash the labels. Touch
+   targets stay at ≥44px per WCAG 2.1 §2.5.5. */
+@media (max-width: 480px) {
+  body { padding: 12px 12px; }
+  .card { border-radius: 14px; }
+  .card-hero { padding: 22px 20px 0; }
+  .reward-summary { margin: 0 20px 18px; padding: 14px 14px; }
+  .form-section { padding: 0 20px 22px; }
+  .title { font-size: 19px; }
+  .subtitle { font-size: 12.5px; margin-bottom: 16px; }
+  .reward-summary .points { font-size: 26px; }
+  .tab-btn { padding: 12px 8px; font-size: 12px; min-height: 44px; }
+  .field input { font-size: 16px; /* keeps iOS from auto-zooming */ padding: 12px 12px; min-height: 44px; }
+  .submit-btn { padding: 14px; font-size: 14.5px; min-height: 48px; }
+  .client-logo-chip { width: 60px; height: 60px; margin-bottom: 10px; }
+}
+@media (max-width: 360px) {
+  /* Stack the tab pair on the very narrowest viewports so the
+     "Email" / "WBM key" labels stay legible. */
+  .form-tabs { grid-template-columns: 1fr; }
+}
+.message {
+  display: none;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+.message.show { display: block; }
+.message.err { background: rgba(236,0,139,.08); color: var(--punch); border: 1px solid rgba(236,0,139,.16); }
+.message.warn { background: rgba(232,161,26,.10); color: #8a5c00; border: 1px solid rgba(232,161,26,.20); }
+.success {
+  text-align: center;
+  padding: 32px 28px;
+}
+.success-icon {
+  width: 60px; height: 60px;
+  background: rgba(24,163,110,.12);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 16px;
+}
+.success-icon svg { width: 32px; height: 32px; stroke: var(--green); fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.success h2 { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+.success p { color: var(--text-mid); font-size: 14px; margin-bottom: 10px; }
+.success .recorded-points {
+  background: rgba(24,163,110,.06);
+  padding: 12px 16px;
+  border-radius: 10px;
+  margin: 16px 0 6px;
+}
+.success .recorded-points strong { color: var(--green); }
+.footer {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 24px;
+  padding-bottom: 12px;
+}
+</style>
+</head>
+<body>
+
+<div class="card" id="card">
+  <div id="loading-state" class="card-hero" style="padding:32px 28px;text-align:center;color:var(--text-muted);font-size:13px">
+    Loading reward&hellip;
+  </div>
+
+  <!-- Reward form (hidden until item resolves) -->
+  <div id="redeem-form" style="display:none">
+    <div class="card-hero" id="card-hero">
+      <div class="brand-tag">Rewards Foundry</div>
+      <!-- 2026-06-19 — client logo chip + client name line. Both are
+           hidden by default; loadItem() flips .has-logo / .has-client
+           on #card-hero once the lookup resolves. -->
+      <div class="client-logo-chip" id="client-logo-chip"><img id="client-logo-img" alt=""></div>
+      <div class="client-name-line" id="client-name-line">&mdash;</div>
+      <div class="title" id="reward-name">&mdash;</div>
+      <div class="subtitle">Enter your email or your Wellbeing Matters key to record your redemption.</div>
+    </div>
+
+    <!-- 2026-06-19 — Marty: "Also the value in $ amount can we removed
+         from this screen." Dropped the .value line that read "Worth
+         A$5.00". The points figure stays as the primary callout. -->
+    <div class="reward-summary">
+      <div class="row location" id="row-location" style="display:none">
+        <span class="lbl">Location</span><span class="val" id="reward-location">&mdash;</span>
+      </div>
+      <div class="points" id="reward-points">&mdash;</div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-tabs" role="tablist">
+        <button type="button" class="tab-btn active" data-tab="email" onclick="setTab('email')">Email</button>
+        <button type="button" class="tab-btn" data-tab="key" onclick="setTab('key')">WBM key</button>
+      </div>
+
+      <div id="msg-host"></div>
+
+      <div id="tab-email">
+        <div class="field">
+          <label for="inp-email">Your email address</label>
+          <input id="inp-email" type="email" placeholder="you@example.com" autocomplete="email">
+        </div>
+      </div>
+
+      <div id="tab-key" style="display:none">
+        <div class="field">
+          <label for="inp-key">Your WBM key</label>
+          <input id="inp-key" type="text" placeholder="ABC123XY" autocomplete="off" maxlength="16">
+          <div class="field-hint">
+            The 4&ndash;16 character code from your Wellbeing Matters evaluation completion email.
+          </div>
+        </div>
+      </div>
+
+      <button type="button" class="submit-btn" id="submit-btn" onclick="submitRedemption()">Redeem this reward</button>
+    </div>
+  </div>
+
+  <!-- Success state -->
+  <div id="success-state" class="success" style="display:none">
+    <div class="success-icon">
+      <svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+    </div>
+    <h2>Thank you</h2>
+    <p>Your redemption has been recorded.</p>
+    <div class="recorded-points" id="success-summary"></div>
+    <p style="font-size:12.5px;color:var(--text-muted);margin-top:14px">You can close this window.</p>
+  </div>
+
+  <!-- Permanent error (item disabled / WPD / 404) -->
+  <div id="dead-state" style="display:none;padding:32px 28px;text-align:center">
+    <div class="title" id="dead-title">Reward unavailable</div>
+    <div class="subtitle" id="dead-msg">This reward link isn’t available.</div>
+  </div>
+</div>
+
+<!-- 2026-06-19 — Marty: "Make it at the bottom and link open tab to
+     www.the-good-foundry.com." Footer wordmark swapped from
+     Wellbeing Matters to The Good Foundry; target=_blank +
+     rel=noopener opens in a new tab without leaking the referrer. -->
+<div class="footer">Powered by <a href="https://www.the-good-foundry.com" target="_blank" rel="noopener" style="color:var(--text-muted);font-weight:600;text-decoration:none">The Good Foundry</a></div>
+
+<script>
+const params = new URLSearchParams(location.search);
+const TOKEN  = params.get('t') || '';
+let _activeTab = 'email';
+
+function $(id) { return document.getElementById(id); }
+
+function setTab(name) {
+  _activeTab = name;
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === name);
+  });
+  $('tab-email').style.display = (name === 'email') ? '' : 'none';
+  $('tab-key').style.display   = (name === 'key')   ? '' : 'none';
+  /* Clear messages on tab swap so a previous error doesn't stick. */
+  $('msg-host').innerHTML = '';
+}
+
+function showMessage(text, kind) {
+  $('msg-host').innerHTML = '<div class="message show ' + kind + '">' + text + '</div>';
+}
+
+function showDead(title, msg) {
+  $('loading-state').style.display = 'none';
+  $('redeem-form').style.display   = 'none';
+  $('dead-title').textContent = title;
+  $('dead-msg').textContent   = msg;
+  $('dead-state').style.display = '';
+}
+
+function formatMoney(amt, cur) {
+  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur || 'AUD' }).format(amt); }
+  catch (_e) { return (cur || 'AUD') + ' ' + Number(amt || 0).toFixed(2); }
+}
+
+/* 2026-06-19 — theme-key → brand colour map. Mirrors the same set
+   used across wm_bank.html / wm_vault.html / rep_wallet. When the
+   client's organisations.theme_key is set, we override --brand on
+   the document so every var(--brand) surface (buttons, focus
+   rings, logo chip border, brand-tag, points headline) flips. */
+const THEME_PRIMARIES = {
+  tgf:      { primary: '#e8420a', dark: '#b8350a' },
+  ms:       { primary: '#0078d4', dark: '#005ea2' },
+  downer:   { primary: '#29bfe0', dark: '#1a9bb9' },
+  coca:     { primary: '#f40009', dark: '#c10007' },
+  eap:      { primary: '#4a9fd4', dark: '#3478a6' },
+  drake:    { primary: '#2db87a', dark: '#208656' },
+  mcquaid:  { primary: '#3aab7b', dark: '#287a58' }
+};
+function _hexToRgba(hex, a) {
+  try {
+    const m = hex.replace('#', '');
+    const r = parseInt(m.slice(0, 2), 16);
+    const g = parseInt(m.slice(2, 4), 16);
+    const b = parseInt(m.slice(4, 6), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+  } catch (_e) { return 'rgba(232,98,26,' + a + ')'; }
+}
+function applyClientBrand(client) {
+  if (!client) return;
+  /* 2026-06-19 — Marty: "this is not carrying over client set theme
+     - fix." Switched to using the server-resolved theme_primary
+     (returned by rewards_redeem.php via theme_helper.php's canonical
+     wm_resolve_theme_by_key). The client-side THEME_PRIMARIES map
+     stays as a final fallback for when the server can't resolve.
+     Server-resolved value wins because it covers built-in themes
+     (hoc/aging-well not in the JS map) AND admin-authored custom
+     themes from data/theme_config.json. */
+  let primary = String(client.theme_primary || '').trim();
+  if (!primary) {
+    const key = String(client.theme_key || '').toLowerCase();
+    const fallback = THEME_PRIMARIES[key];
+    if (fallback) primary = fallback.primary;
+  }
+  if (primary) {
+    const root = document.documentElement;
+    /* Compute a dark variant from the primary for the chip border
+       + button hover. Drop ~10% lightness via a simple hex tweak;
+       keeps the dependency surface small. */
+    function _darken(hex, factor) {
+      try {
+        const m = hex.replace('#', '');
+        const r = Math.round(parseInt(m.slice(0, 2), 16) * factor);
+        const g = Math.round(parseInt(m.slice(2, 4), 16) * factor);
+        const b = Math.round(parseInt(m.slice(4, 6), 16) * factor);
+        return '#' + [r, g, b].map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join('');
+      } catch (_e) { return hex; }
+    }
+    root.style.setProperty('--brand',      primary);
+    root.style.setProperty('--brand-dark', _darken(primary, 0.78));
+    root.style.setProperty('--brand-pale', _hexToRgba(primary, 0.08));
+    root.style.setProperty('--brand-ring', _hexToRgba(primary, 0.18));
+  }
+  /* Logo + client name reveal. Drop .has-logo when no logo URL so
+     the chip stays hidden (preserves vertical rhythm). */
+  const hero = $('card-hero');
+  if (client.logo_url) {
+    $('client-logo-img').src = client.logo_url;
+    $('client-logo-img').alt = (client.name || '') + ' logo';
+    hero.classList.add('has-logo');
+  }
+  if (client.name) {
+    $('client-name-line').textContent = client.name;
+    hero.classList.add('has-client');
+  }
+  /* Title also tags the document so screen readers + the tab title
+     read as the client's. */
+  if (client.name) document.title = 'Redeem your reward · ' + client.name;
+}
+
+function loadItem() {
+  if (!TOKEN) { showDead('Reward link malformed', 'The link you used is missing the reward token.'); return; }
+  fetch('/api/v1/redeem.php?t=' + encodeURIComponent(TOKEN), { cache: 'no-store' })
+    .then(r => r.json().then(j => ({ status: r.status, body: j })))
+    .then(({ status, body }) => {
+      if (status === 404)         return showDead('Reward not found', 'This QR code or link isn’t recognised. Check with the issuer.');
+      if (status === 410)         return showDead('Reward expired', 'This reward is no longer active.');
+      if (status === 422)         return showDead('Reward unavailable', body.error || 'Rewards Foundry isn’t enabled for this subscription.');
+      if (!body || !body.ok)      return showDead('Reward unavailable', (body && body.error) || 'Something went wrong loading this reward.');
+      /* Apply client branding FIRST so the surface paints with the
+         correct theme before the form reveals. */
+      applyClientBrand(body.client || null);
+      const it = body.item;
+      $('reward-name').textContent = it.name;
+      if (it.location) {
+        $('row-location').style.display = '';
+        $('reward-location').textContent = it.location;
+      }
+      const pts = Number(it.points_allocated || 0);
+      $('reward-points').textContent = pts + ' point' + (pts === 1 ? '' : 's');
+      $('loading-state').style.display = 'none';
+      $('redeem-form').style.display   = '';
+    })
+    .catch(() => showDead('Couldn’t reach server', 'Please check your connection and refresh the page.'));
+}
+
+function submitRedemption() {
+  const btn = $('submit-btn');
+  btn.disabled = true; btn.textContent = 'Submitting…';
+  $('msg-host').innerHTML = '';
+
+  const email = ($('inp-email').value || '').trim();
+  const key   = ($('inp-key').value   || '').trim().toUpperCase();
+
+  /* The active tab decides which field we submit. Keep the other
+     blank so the server validation doesn't get confused by an
+     un-touched value from the opposite tab. */
+  const body = {};
+  if (_activeTab === 'email') body.email = email;
+  else                        body.key   = key;
+
+  fetch('/api/v1/redeem.php?t=' + encodeURIComponent(TOKEN), {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(body)
+  })
+    .then(r => r.json().then(j => ({ status: r.status, body: j })))
+    .then(({ status, body }) => {
+      btn.disabled = false; btn.textContent = 'Redeem this reward';
+      if (status === 429 && body.limit_reached) {
+        /* Per-person cap reached — sticky message, don't navigate
+           away so the user can read why. */
+        showMessage(body.error || 'You have already redeemed this reward the maximum number of times.', 'warn');
+        return;
+      }
+      if (!body || !body.ok) {
+        showMessage((body && body.error) || 'We couldn’t record your redemption. Try again in a moment.', 'err');
+        return;
+      }
+      /* Success — replace the form with the thank-you screen.
+         2026-06-19 — Marty: "Also the value in $ amount can we
+         removed from this screen." Dropped the "worth $X" suffix
+         from the success summary; just shows points awarded. */
+      $('redeem-form').style.display = 'none';
+      $('success-summary').innerHTML =
+          '<strong>' + (body.points_awarded || 0) + ' point' + ((body.points_awarded || 0) === 1 ? '' : 's') + '</strong> awarded';
+      $('success-state').style.display = '';
+    })
+    .catch(() => {
+      btn.disabled = false; btn.textContent = 'Redeem this reward';
+      showMessage('Network error — please try again.', 'err');
+    });
+}
+
+document.addEventListener('DOMContentLoaded', loadItem);
+
+/* Enter-to-submit on either input. */
+document.addEventListener('keydown', function (ev) {
+  if (ev.key !== 'Enter') return;
+  if (ev.target && (ev.target.id === 'inp-email' || ev.target.id === 'inp-key')) {
+    ev.preventDefault();
+    submitRedemption();
+  }
+});
+</script>
+</body>
+</html>
