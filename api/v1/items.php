@@ -46,7 +46,7 @@ $base  = $proto . '://' . $host;
    composited PNG for up to a day. Bump &v=... here whenever the
    composition contract changes (logo ratio, padding, background
    colour logic, etc.) so the URL changes and caches miss. */
-$qrCacheBust = '20260621-logo-25pct-scannable';
+$qrCacheBust = '20260621-watermark-default';
 $decorate = function (array $row) use ($base, $qrCacheBust): array {
     $tok = (string) $row['qr_token'];
     $row['public_url'] = $base . '/redeem?t=' . rawurlencode($tok);

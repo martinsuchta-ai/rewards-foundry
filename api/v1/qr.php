@@ -70,11 +70,11 @@ $logoUrl  = trim((string) ($row['logo_url']          ?? ''));
 
 require_once __DIR__ . '/../lib/qr_compose_helper.php';
 
-/* 2026-06-21 — Marty: A/B preview of a "watermark"-style logo
-   composition (full-width logo at ~30% opacity over the QR vs
-   the current centered logo). Toggled via ?style=watermark.
-   Default stays 'centered' so existing surfaces are unchanged. */
-$style = isset($_GET['style']) ? (string) $_GET['style'] : 'centered';
+/* 2026-06-21 — Marty approved watermark after testing on a phone
+   ("It works!"). Default is now 'watermark' (~70%-width faded logo
+   over the full QR); pass ?style=centered to opt back into the
+   classic 25%-centred logo if any specific surface needs it. */
+$style = isset($_GET['style']) ? (string) $_GET['style'] : 'watermark';
 
 $result = wm_qr_compose($publicUrl, $size, $logoUrl, $themeHex, $style);
 

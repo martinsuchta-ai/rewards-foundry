@@ -59,11 +59,15 @@ if (!function_exists('wm_qr_compose')) :
    box rendered them invisible -- this lets callers pass the
    client's brand primary instead so the logo pops. Invalid hex
    falls back to white. */
-function wm_qr_compose(string $text, int $size, string $logoUrl, string $themeHex = '#FFFFFF', string $style = 'centered'): array
+function wm_qr_compose(string $text, int $size, string $logoUrl, string $themeHex = '#FFFFFF', string $style = 'watermark'): array
 {
+    /* 2026-06-21 — Marty approved watermark style after testing on a
+       real phone ("It works!"). Default flipped from 'centered' to
+       'watermark'. Centered branch retained for ?style=centered
+       fallback in case any specific deployment needs the old look. */
     $size = max(120, min(1024, $size));
     $style = strtolower(trim($style));
-    if (!in_array($style, ['centered', 'watermark'], true)) $style = 'centered';
+    if (!in_array($style, ['centered', 'watermark'], true)) $style = 'watermark';
 
     /* ── 1. Fetch the QR from quickchart ──────────────────────
        ecLevel=H only when we're embedding a logo — gives ~30%
