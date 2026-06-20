@@ -1,0 +1,8 @@
+# Block direct access to *.sql files in this directory.
+# The migration runner reads them server-side; the public web should
+# never see them (column names, default rows, etc. are sensitive
+# enough that we don't leak them via a stray crawl).
+
+<FilesMatch "\.sql$">
+    Require all denied
+</FilesMatch>

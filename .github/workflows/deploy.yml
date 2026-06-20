@@ -1,0 +1,66 @@
+name: Deploy to SiteGround (rewards-foundry.com)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Install lftp
+        run: sudo apt-get install -y lftp
+
+      - name: Deploy via FTPS
+        # Explicit FTPS over port 21 (AUTH TLS) — what SG shared
+        # hosting actually offers. The implicit-FTPS ftps:// scheme
+        # tries port 990 which SG does not expose; that bit us during
+        # the Affiliate + TGF setups. Use ftp:// + force SSL via lftp
+        # directives.
+        #
+        # Mirror source: ./public/ + ./app/ + ./api/
+        #   → /rewards-foundry.com/public_html/  (addon-domain webroot)
+        #
+        # NOTE on target path: if SG provisioned rewards-foundry.com as
+        # an addon domain on an existing account, the webroot is
+        # /rewards-foundry.com/public_html/. If it's the account's
+        # PRIMARY domain (created as a fresh account), it's just
+        # /public_html/. The TGF deploy started wrong (account-root
+        # vs addon-webroot) and had to be fixed mid-flight — check
+        # via FileZilla which one applies BEFORE blaming the workflow.
+        #
+        # Three top-level dirs ship: public (static + redeem.html),
+        # app (admin UI shell), api (PHP endpoints + migrations).
+        run: |
+          lftp -d -e "
+            set ftp:ssl-force yes;
+            set ftp:ssl-protect-data yes;
+            set ssl:verify-certificate no;
+            open -u '${{ secrets.SG_USER }}','${{ secrets.SG_PASS }}' ftp://${{ secrets.SG_HOST }};
+            mirror -R --no-perms --delete --verbose \
+              -X .git/ \
+              -X .github/ \
+              -X .vscode/ \
+              -X .claude/ \
+              -X node_modules/ \
+              -X README.md \
+              -X CLAUDE.md \
+              -X .gitignore \
+              ./public/ /public_html/;
+            mirror -R --no-perms --delete --verbose \
+              -X .git/ -X .github/ -X .vscode/ -X .claude/ \
+              ./app/ /public_html/app/;
+            mirror -R --no-perms --delete --verbose \
+              -X .git/ -X .github/ -X .vscode/ -X .claude/ \
+              ./api/ /public_html/api/;
+            pwd;
+            cls -la /public_html/;
+            bye
+          "

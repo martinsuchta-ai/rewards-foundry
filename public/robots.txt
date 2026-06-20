@@ -1,0 +1,8 @@
+User-agent: *
+
+# The landing page is noindex-marked; we don't want crawlers indexing
+# the redemption page (each URL is unique-per-token and personal) or
+# the admin login.
+Disallow: /redeem
+Disallow: /admin
+Disallow: /api

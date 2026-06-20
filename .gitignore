@@ -1,0 +1,22 @@
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Node (in case a build step is ever added)
+node_modules/
+package-lock.json
+
+# Secrets — should NEVER appear in this repo, this is belt-and-braces
+.env
+.env.*
+*_secrets.php
+secrets.json
+
+# Claude session state
+.claude/
