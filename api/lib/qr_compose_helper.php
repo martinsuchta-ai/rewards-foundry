@@ -217,7 +217,24 @@ function wm_qr_compose(string $text, int $size, string $logoUrl, string $themeHe
         $themeRgb = _wm_qr_parse_hex($themeHex);
         $tr = (int) $themeRgb[0]; $tg = (int) $themeRgb[1]; $tb = (int) $themeRgb[2];
         $themeIsWhite = ($tr >= 245 && $tg >= 245 && $tb >= 245);
-        $wmFade = 90;
+        /* 2026-06-22 — brightness-conditional fade so dark themes
+           (typical headerBg navy like #14202e) don't blend to grey
+           at the prior fixed alpha=90. Mirrors the WBM-side helper:
+             dark   -> alpha 50 (~61% opacity, colour reads true)
+             mid    -> alpha 70
+             bright -> alpha 90 (orange/yellow already shows soft)
+           ecLevel=H gives ~30% recovery; 70% logo × 50% opacity for
+           dark pixels is at the upper edge but still inside. */
+        $themeBrightness = ($tr + $tg + $tb) / 3;
+        if ($themeIsWhite) {
+            $wmFade = 90;
+        } elseif ($themeBrightness < 100) {
+            $wmFade = 50;
+        } elseif ($themeBrightness < 170) {
+            $wmFade = 70;
+        } else {
+            $wmFade = 90;
+        }
         $brightThreshold = 230;   /* >= this on all channels = "near white" */
         for ($y = 0; $y < $wmH; $y++) {
             for ($x = 0; $x < $wmW; $x++) {
