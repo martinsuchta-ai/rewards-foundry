@@ -99,7 +99,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') rewards_json_err('GET or POST require
 $body = json_decode(file_get_contents('php://input') ?: '', true);
 if (!is_array($body)) rewards_json_err('JSON body required', 400);
 
-$token = trim((string) ($body['token'] ?? ''));
+/* 2026-06-22 — Marty: "When I go to /redeem?t=<token>, put in an
+   email, I get 'valid token required'". The public redeem.html
+   passes the token in the URL query string (?t=<token>) and the
+   POST body carries only email/key. Server was reading token ONLY
+   from $body['token'] which is empty in that flow. Accept token
+   from either source (body wins if both present, for explicit
+   server-to-server callers). */
+$token = trim((string) ($body['token'] ?? $_GET['t'] ?? ''));
 $email = strtolower(trim((string) ($body['email'] ?? '')));
 $key   =            trim((string) ($body['key']   ?? ''));
 
