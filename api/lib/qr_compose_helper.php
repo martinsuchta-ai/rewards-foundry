@@ -235,7 +235,13 @@ function wm_qr_compose(string $text, int $size, string $logoUrl, string $themeHe
         } else {
             $wmFade = 90;
         }
-        $brightThreshold = 230;   /* >= this on all channels = "near white" */
+        /* 2026-06-22 (second iteration) — dropped from 230 to 180 so
+           anti-aliased glyph EDGES (typically RGB 180-220) get the
+           theme recolour, not just the pure-white core. Without this
+           lower threshold, brand wordmarks render as "ghost text"
+           on the QR -- core glyphs tinted but halos faint grey.
+           Mirrors WBM-side helper. */
+        $brightThreshold = 180;
         for ($y = 0; $y < $wmH; $y++) {
             for ($x = 0; $x < $wmW; $x++) {
                 $rgba = imagecolorat($wmScaled, $x, $y);
