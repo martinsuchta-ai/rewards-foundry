@@ -442,10 +442,26 @@ function applyClientBrand(client) {
     root.style.setProperty('--brand-ring', _hexToRgba(primary, 0.18));
   }
   /* Logo + client name reveal. Drop .has-logo when no logo URL so
-     the chip stays hidden (preserves vertical rhythm). */
+     the chip stays hidden (preserves vertical rhythm).
+     2026-06-22 — Marty: logo URLs hosted on smart-tools-foundry.com
+     work in a browser but fail as cross-origin <img src=...> from
+     rewards-foundry.com (broken-image icon). Likely WBM-side
+     hot-link protection or Apache rule keying off the Referer
+     header. Route external URLs through /api/v1/logo_proxy.php
+     which fetches server-side (no Referer mismatch) and streams
+     same-origin bytes back to the browser. Same-origin URLs pass
+     through verbatim. */
   const hero = $('card-hero');
+  function _logoSrc(url) {
+    if (!url) return '';
+    try {
+      const u = new URL(url, window.location.href);
+      if (u.origin === window.location.origin) return url;
+      return '/api/v1/logo_proxy.php?url=' + encodeURIComponent(url);
+    } catch (_e) { return url; }
+  }
   if (client.logo_url) {
-    $('client-logo-img').src = client.logo_url;
+    $('client-logo-img').src = _logoSrc(client.logo_url);
     $('client-logo-img').alt = (client.name || '') + ' logo';
     hero.classList.add('has-logo');
   }
