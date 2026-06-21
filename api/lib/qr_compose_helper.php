@@ -203,19 +203,37 @@ function wm_qr_compose(string $text, int $size, string $logoUrl, string $themeHe
         imagealphablending($wmScaled, true);
         @imagecopyresampled($wmScaled, $logoImg, 0, 0, 0, 0, $wmW, $wmH, $logoW, $logoH);
 
-        /* Fade by manipulating per-pixel alpha. Alpha 90 on a GD
-           scale of 0=opaque..127=transparent yields ~0.29 visible
-           opacity. */
+        /* Fade by manipulating per-pixel alpha + recolour near-white
+           pixels to the client theme primary so white-on-transparent
+           logos (~70% of WBM client logos) show up against the QR's
+           white modules. Without this pass, a white-on-transparent
+           logo fades to "faintly white over white" -- invisible.
+           Pixel rule: pixels brighter than the threshold AND opaque
+           enough to count get repainted in the theme colour first,
+           THEN faded along with everything else. Themed colours that
+           the logo already carries (a green company logo, say) pass
+           through untouched. Alpha 90 on a GD scale of
+           0=opaque..127=transparent yields ~0.29 visible opacity. */
+        $themeRgb = _wm_qr_parse_hex($themeHex);
+        $tr = (int) $themeRgb[0]; $tg = (int) $themeRgb[1]; $tb = (int) $themeRgb[2];
+        $themeIsWhite = ($tr >= 245 && $tg >= 245 && $tb >= 245);
         $wmFade = 90;
+        $brightThreshold = 230;   /* >= this on all channels = "near white" */
         for ($y = 0; $y < $wmH; $y++) {
             for ($x = 0; $x < $wmW; $x++) {
                 $rgba = imagecolorat($wmScaled, $x, $y);
                 $a = ($rgba >> 24) & 0x7F;
                 if ($a === 127) continue;
-                $newA = min(127, $a + $wmFade);
                 $r = ($rgba >> 16) & 0xFF;
                 $g = ($rgba >>  8) & 0xFF;
                 $b =  $rgba        & 0xFF;
+                /* Recolour near-white pixels to the theme primary --
+                   unless the theme itself is also near-white (would
+                   be a no-op + would leave the logo invisible). */
+                if (!$themeIsWhite && $r >= $brightThreshold && $g >= $brightThreshold && $b >= $brightThreshold) {
+                    $r = $tr; $g = $tg; $b = $tb;
+                }
+                $newA = min(127, $a + $wmFade);
                 $faded = imagecolorallocatealpha($wmScaled, $r, $g, $b, $newA);
                 imagesetpixel($wmScaled, $x, $y, $faded);
             }
