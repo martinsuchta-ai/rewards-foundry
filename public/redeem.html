@@ -339,6 +339,20 @@ body {
     <p style="font-size:12.5px;color:var(--text-muted);margin-top:14px">You can close this window.</p>
   </div>
 
+  <!-- 2026-06-23 — Already-a-WBM-member state. Marty: "If so present
+       a nice message. Otherwise honour the reward redemption." When
+       the linked WBM sub recognises the email/key, this screen
+       replaces the success/failure surface — no redemption is
+       recorded server-side. -->
+  <div id="member-state" style="display:none;padding:32px 28px;text-align:center">
+    <div style="width:64px;height:64px;border-radius:50%;background:rgba(102,44,144,0.10);margin:0 auto 18px;display:flex;align-items:center;justify-content:center">
+      <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="#662C90" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+    </div>
+    <div class="title" id="member-title" style="font-size:20px;font-weight:800;color:var(--text-dark,#1c2b3a);margin-bottom:8px">You’re already with us</div>
+    <div id="member-body" style="font-size:14px;color:var(--text-mid,#4a5f72);line-height:1.65;max-width:420px;margin:0 auto">We recognise you on this Wellbeing Matters subscription — this benefit is already included.</div>
+    <p style="font-size:12.5px;color:var(--text-muted);margin-top:18px">You can close this window.</p>
+  </div>
+
   <!-- Permanent error (item disabled / WPD / 404) -->
   <div id="dead-state" style="display:none;padding:32px 28px;text-align:center">
     <div class="title" id="dead-title">Reward unavailable</div>
@@ -535,6 +549,17 @@ function submitRedemption() {
       }
       if (!body || !body.ok) {
         showMessage((body && body.error) || 'We couldn’t record your redemption. Try again in a moment.', 'err');
+        return;
+      }
+      /* 2026-06-23 — already_wbm_member path. The user's email/key
+         matched the linked WBM subscription, so no redemption was
+         recorded server-side. Swap to the member-state screen with
+         a personalised friendly message. */
+      if (body.already_wbm_member) {
+        $('redeem-form').style.display = 'none';
+        var msg = body.message || 'We recognise you on the linked Wellbeing Matters subscription — this benefit is already included.';
+        $('member-body').textContent = msg;
+        $('member-state').style.display = '';
         return;
       }
       /* Success — replace the form with the thank-you screen.

@@ -186,6 +186,70 @@ try {
     $moneyValue    = $pointsAwarded * $valuePer;
     $currency      = (string) $item['currency'];
 
+    /* ── WBM membership pre-check (2026-06-23 — Marty) ─────────────
+       When the reward is linked to a WBM subscription (sub_id starts
+       SUB-), call the WBM membership endpoint with the entered email
+       or key. If the user is found on that sub, we DO NOT honour the
+       redemption — instead return a friendly already_wbm_member
+       response and let the UI show a warm message. If they aren't a
+       member (or the check fails entirely / can't reach WBM /
+       shared secret missing), fall through to the normal INSERT —
+       fail-open semantics so a network blip or misconfig can't
+       block legitimate redemptions.
+
+       The WBM endpoint contract is:
+         GET ?secret=...&sub_id=SUB-XXX&email=foo  (or &key=YZQ...)
+         → { ok:true, in_wbm:bool, respondent?, org? } */
+    $itemSubId = trim((string) ($item['sub_id'] ?? ''));
+    if (preg_match('/^SUB-[A-Za-z0-9]{1,32}$/', $itemSubId)) {
+        $wbmSecret = (string) getenv('WBM_REWARDS_SHARED_SECRET');
+        if ($wbmSecret !== '') {
+            $checkBase = (string) (getenv('WBM_MEMBERSHIP_CHECK_URL') ?: 'https://smart-tools-foundry.com/WBM/api/wbm_membership_check.php');
+            $checkQs   = 'secret=' . urlencode($wbmSecret)
+                       . '&sub_id=' . urlencode($itemSubId)
+                       . ($email !== '' ? ('&email=' . urlencode($email)) : '')
+                       . ($key   !== '' ? ('&key='   . urlencode($key))   : '');
+            $checkRes  = null;
+            try {
+                $ch = curl_init($checkBase . '?' . $checkQs);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_CONNECTTIMEOUT => 4,
+                    CURLOPT_TIMEOUT        => 6,
+                    CURLOPT_USERAGENT      => 'rewards-foundry/redeem',
+                ]);
+                $body = curl_exec($ch);
+                $http = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                if ($http === 200 && $body !== false) {
+                    $j = json_decode((string) $body, true);
+                    if (is_array($j) && !empty($j['ok'])) $checkRes = $j;
+                }
+            } catch (Throwable $_eCheck) {
+                error_log('[redeem] WBM membership check threw: ' . $_eCheck->getMessage());
+            }
+            if (is_array($checkRes) && !empty($checkRes['in_wbm'])) {
+                $resp = is_array($checkRes['respondent'] ?? null) ? $checkRes['respondent'] : [];
+                $org  = is_array($checkRes['org']        ?? null) ? $checkRes['org']        : [];
+                $firstName = trim((string) ($resp['first_name'] ?? ''));
+                $orgName   = trim((string) ($org['name']        ?? ''));
+                $hello     = $firstName !== '' ? ('Hi ' . $firstName . '!') : 'Hi there!';
+                $msg       = $hello . ' You\'re already part of the '
+                           . ($orgName !== '' ? ($orgName . ' ') : '')
+                           . 'Wellbeing Matters community — this benefit is included with your membership, no redemption needed.';
+                rewards_json_ok([
+                    'redemption_id'       => null,
+                    'already_wbm_member'  => true,
+                    'message'             => $msg,
+                    'respondent_name'     => trim($firstName . ' ' . (string) ($resp['last_name'] ?? '')),
+                    'org_name'            => $orgName,
+                    'item_name'           => (string) $item['name'],
+                ]);
+                /* rewards_json_ok exits — control doesn't return. */
+            }
+        }
+    }
+
     /* ── Insert audit row ──────────────────────────────────────── */
     $userAgent = isset($_SERVER['HTTP_USER_AGENT'])
         ? substr((string) $_SERVER['HTTP_USER_AGENT'], 0, 512)
