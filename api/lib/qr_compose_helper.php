@@ -72,9 +72,15 @@ function wm_qr_compose(string $text, int $size, string $logoUrl, string $themeHe
     /* ── 1. Fetch the QR from quickchart ──────────────────────
        ecLevel=H only when we're embedding a logo — gives ~30%
        damage tolerance to swallow the centre cut-out. Plain QRs
-       use the default (M, ~15%) which is more compact. */
+       use the default (M, ~15%) which is more compact.
+       2026-06-23 — Marty: "use #C9C9C9 instead of the BLACK
+       components of the QR." dark=C9C9C9 swaps the data-module
+       fill from black to light grey. The composited logo stays
+       untouched (drawn over the QR after fetch). Mirror of the
+       WBM helper change. */
     $qrUrl = 'https://quickchart.io/qr?text=' . urlencode($text)
            . '&size=' . $size . '&margin=2'
+           . '&dark=C9C9C9'
            . ($logoUrl !== '' ? '&ecLevel=H' : '');
 
     $ctx = stream_context_create([
