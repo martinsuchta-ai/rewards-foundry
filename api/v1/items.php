@@ -165,12 +165,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 " WHERE `id` = ? AND `consumer_id` = ?"
             );
             $upd->execute($args);
-            if ($upd->rowCount() === 0) {
-                /* Either no such id OR id belongs to a different consumer.
-                   Either way, this consumer sees "not found". */
-                rewards_json_err('item not found', 404);
-            }
-
+            /* 2026-06-22 — Marty: clicked Save on an item edit without
+               changing anything material, hit "item not found". Root
+               cause: MySQL PDO rowCount() on UPDATE returns the count
+               of CHANGED rows by default (PDO::MYSQL_ATTR_FOUND_ROWS
+               off), not MATCHED rows. So an idempotent save (or any
+               save where the new values equal the current values)
+               returned 0 even though the row exists, and the legacy
+               "either no such id OR wrong consumer" branch falsely
+               reported the row missing.
+               Switched to a follow-up SELECT for existence -- the
+               same SELECT we already need to build the decorated
+               response. If the row comes back, save succeeded
+               regardless of how many columns actually mutated. If it
+               doesn't, the id genuinely doesn't exist for this
+               consumer and we 404. */
             $st = $pdo->prepare(
                 "SELECT i.*,
                         (SELECT COUNT(*) FROM `rewards_redemption` rr
@@ -180,6 +189,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
             $st->execute([$id, (int) $consumer['id']]);
             $row = $st->fetch(PDO::FETCH_ASSOC);
+            if (!$row) {
+                /* Either no such id OR id belongs to a different
+                   consumer. Either way, this consumer sees "not found". */
+                rewards_json_err('item not found', 404);
+            }
         } catch (Throwable $e) {
             rewards_safe_error_response($e, 'update failed');
         }
