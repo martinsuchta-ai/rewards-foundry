@@ -176,15 +176,19 @@ body {
      theme set not white?" Backed with var(--brand) so the chip
      reads in the client's brand colour; logo inside renders on the
      branded ground. Border kept for definition; padding stays so
-     the logo doesn't touch the edges. */
+     the logo doesn't touch the edges.
+     2026-06-22 — Marty: "Can you 3x the logo/image on the redeem
+     page". 72px → 216px on desktop, 60px → 180px on mobile.
+     Padding scaled proportionally (8 → 16) so the logo gets more
+     of the chip area too instead of looking lost in a big frame. */
   display: none;
-  width: 72px;
-  height: 72px;
+  width: 216px;
+  height: 216px;
   margin: 0 auto 14px;
-  padding: 8px;
+  padding: 16px;
   background: var(--brand);
   border: 2px solid var(--brand-dark, var(--brand));
-  border-radius: 18px;
+  border-radius: 36px;
   box-sizing: border-box;
   align-items: center;
   justify-content: center;
@@ -217,7 +221,7 @@ body {
   .tab-btn { padding: 12px 8px; font-size: 12px; min-height: 44px; }
   .field input { font-size: 16px; /* keeps iOS from auto-zooming */ padding: 12px 12px; min-height: 44px; }
   .submit-btn { padding: 14px; font-size: 14.5px; min-height: 48px; }
-  .client-logo-chip { width: 60px; height: 60px; margin-bottom: 10px; }
+  .client-logo-chip { width: 180px; height: 180px; padding: 14px; border-radius: 32px; margin-bottom: 10px; }
 }
 @media (max-width: 360px) {
   /* Stack the tab pair on the very narrowest viewports so the
