@@ -177,14 +177,42 @@ function wm_qr_compose(string $text, int $size, string $logoUrl, string $themeHe
     $logoW = imagesx($logoImg);
     $logoH = imagesy($logoImg);
 
-    /* ── 3b. Watermark style ──────────────────────────────────
-       Marty 2026-06-21 -- experimental alternative to the centred
-       logo. Resize the logo to ~70% of QR width, fade it heavily
-       (alpha ~0.29 of opaque), centre-paste over the QR with no
-       padding box. Scanner reads the QR through the faded logo
-       because dark-on-dark stays dark, light-on-light stays light;
-       only mid-tone pixels at the logo edges shift slightly.
-       Toggled by ?style=watermark at the endpoint level. */
+    /* 2026-06-22 — Marty: "On rewards QR codes logo overlay you are
+       not blending this in like we do in bank. Therefore the QR
+       code is not readable." Screenshot showed a vivid solid-fill
+       badge logo (multi-colour people-in-circle, no transparency).
+       Watermark mode assumes a white-on-transparent wordmark where
+       most pixels are transparent → narrow obscuring footprint.
+       For an OPAQUE-throughout badge, the 70%-width sprite at any
+       fade level covers ~49% of the QR area, well past ecLevel H's
+       ~30% recovery envelope. Auto-detect: if the logo has < 25%
+       transparency, it's a solid badge and we silently fall back
+       to the centred-with-padding style which historically scans
+       reliably regardless of logo composition.
+       Threshold of 25% chosen so wordmarks-with-thick-strokes
+       (which can be ~30-40% opaque) still get the watermark path;
+       only true solid-fill badges trip the fallback. */
+    if ($style === 'watermark') {
+        $opaqueCount = 0; $totalCount = $logoW * $logoH;
+        if ($totalCount > 0) {
+            $sampleStride = max(1, (int) sqrt($totalCount / 4000));
+            $sampled = 0; $sampleOpaque = 0;
+            for ($_sy = 0; $_sy < $logoH; $_sy += $sampleStride) {
+                for ($_sx = 0; $_sx < $logoW; $_sx += $sampleStride) {
+                    $sampled++;
+                    $_rgba = imagecolorat($logoImg, $_sx, $_sy);
+                    $_alpha = ($_rgba >> 24) & 0x7F;
+                    if ($_alpha < 100) $sampleOpaque++;
+                }
+            }
+            $opaqueRatio = $sampled > 0 ? ($sampleOpaque / $sampled) : 0.0;
+            if ($opaqueRatio > 0.75) {
+                /* Solid-fill badge: bail to centred-with-padding so
+                   the QR stays scannable. */
+                $style = 'centered';
+            }
+        }
+    }
     if ($style === 'watermark') {
         $wmTarget = (int) round($qrW * 0.70);
         if ($logoH > $logoW) {
