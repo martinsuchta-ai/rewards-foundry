@@ -73,14 +73,12 @@ function wm_qr_compose(string $text, int $size, string $logoUrl, string $themeHe
        ecLevel=H only when we're embedding a logo — gives ~30%
        damage tolerance to swallow the centre cut-out. Plain QRs
        use the default (M, ~15%) which is more compact.
-       2026-06-23 — Marty: "use #C9C9C9 instead of the BLACK
-       components of the QR." dark=C9C9C9 swaps the data-module
-       fill from black to light grey. The composited logo stays
-       untouched (drawn over the QR after fetch). Mirror of the
-       WBM helper change. */
+       2026-06-25 — Marty MAYDAY: phones can't scan #C9C9C9 grey
+       modules (~1.2:1 contrast vs white background). Reverting
+       to black for scan reliability. Mirror of the WBM helper
+       change. */
     $qrUrl = 'https://quickchart.io/qr?text=' . urlencode($text)
            . '&size=' . $size . '&margin=2'
-           . '&dark=C9C9C9'
            . ($logoUrl !== '' ? '&ecLevel=H' : '');
 
     $ctx = stream_context_create([
@@ -354,18 +352,17 @@ function wm_qr_compose(string $text, int $size, string $logoUrl, string $themeHe
     imagealphablending($scaled, true);
     @imagecopyresampled($scaled, $logoImg, 0, 0, 0, 0, $newW, $newH, $logoW, $logoH);
 
-    /* Themed padding box behind the logo. Uses max(newW,newH) so a
-       non-square logo still gets a square padding ring (visually
-       cleaner than a tight rectangle).
-       2026-06-21 -- $themeHex resolves to the client's brand
-       primary so white-on-white logos pop. Hex parser is tolerant
-       (accepts "#RRGGBB" / "RRGGBB" / "#rgb" / "rgb"); anything
-       unparseable falls back to white. */
+    /* 2026-06-25 — Marty MAYDAY (phones can't scan): padding box
+       behind the logo was themed-client-primary which masked QR
+       data cells with ambiguous-luminance coloured fill. Mirror
+       of the WBM fix — revert to WHITE so the area under the
+       logo behaves as a clean dead zone the QR's ecLevel=H can
+       interpolate. Trade-off: white-on-white client logos lose
+       their themed backing. Scan reliability > brand contrast. */
     $boxSize = max($newW, $newH) + 2 * $pad;
     $boxX    = (int) (($qrW - $boxSize) / 2);
     $boxY    = (int) (($qrH - $boxSize) / 2);
-    $rgb     = _wm_qr_parse_hex($themeHex);
-    $bgFill  = imagecolorallocate($qrImg, $rgb[0], $rgb[1], $rgb[2]);
+    $bgFill  = imagecolorallocate($qrImg, 255, 255, 255);
     imagefilledrectangle($qrImg, $boxX, $boxY, $boxX + $boxSize - 1, $boxY + $boxSize - 1, $bgFill);
 
     /* Paste the logo, centred. */
