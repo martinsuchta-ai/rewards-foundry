@@ -53,6 +53,10 @@ if (isset($_GET['secrets_probe']) && $_GET['secrets_probe'] === '1') {
             'readable'     => is_file($path) && is_readable($path),
         ];
     }
+    /* 2026-06-25 — Marty hit the not-configured fail-closed
+       message even after editing rewards_secrets.php. Surface the
+       WBM_REWARDS_SHARED_SECRET presence too so the diag answers
+       "did my edit take effect?" without leaking the value. */
     echo json_encode([
         'ok'                  => true,
         'secrets_probe'       => true,
@@ -60,6 +64,20 @@ if (isset($_GET['secrets_probe']) && $_GET['secrets_probe'] === '1') {
         '__DIR__'             => __DIR__,
         'candidates'          => $probe,
         'any_env_loaded'      => (getenv('REWARDS_DB_HOST') !== false && getenv('REWARDS_DB_HOST') !== ''),
+        /* True when the var is set + non-empty. No value leaked. */
+        'wbm_rewards_shared_secret_loaded' =>
+            (getenv('WBM_REWARDS_SHARED_SECRET') !== false &&
+             getenv('WBM_REWARDS_SHARED_SECRET') !== ''),
+        /* Hash of the loaded value so admin can compare across
+           machines (e.g. confirm WBM side has the SAME secret as
+           rewards-foundry side without exposing either). First 8
+           chars of SHA-256 — enough to compare, not enough to
+           reverse. Returns empty when var is missing. */
+        'wbm_rewards_shared_secret_hash8' =>
+            (getenv('WBM_REWARDS_SHARED_SECRET') !== false &&
+             getenv('WBM_REWARDS_SHARED_SECRET') !== '')
+                ? substr(hash('sha256', (string) getenv('WBM_REWARDS_SHARED_SECRET')), 0, 8)
+                : '',
         'note'                => 'Authentication bypassed for this probe-only mode. Remove ?secrets_probe=1 once you have located the file path.',
     ], JSON_PRETTY_PRINT);
     exit;
