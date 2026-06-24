@@ -184,35 +184,83 @@ function wm_qr_compose(string $text, int $size, string $logoUrl, string $themeHe
     /* 2026-06-22 — Marty: "On rewards QR codes logo overlay you are
        not blending this in like we do in bank. Therefore the QR
        code is not readable." Screenshot showed a vivid solid-fill
-       badge logo (multi-colour people-in-circle, no transparency).
-       Watermark mode assumes a white-on-transparent wordmark where
-       most pixels are transparent → narrow obscuring footprint.
-       For an OPAQUE-throughout badge, the 70%-width sprite at any
-       fade level covers ~49% of the QR area, well past ecLevel H's
-       ~30% recovery envelope. Auto-detect: if the logo has < 25%
-       transparency, it's a solid badge and we silently fall back
-       to the centred-with-padding style which historically scans
-       reliably regardless of logo composition.
-       Threshold of 25% chosen so wordmarks-with-thick-strokes
-       (which can be ~30-40% opaque) still get the watermark path;
-       only true solid-fill badges trip the fallback. */
+       badge logo. Watermark mode assumes a white-on-transparent
+       wordmark where most pixels are transparent → narrow
+       obscuring footprint. For an OPAQUE-throughout badge, the
+       70%-width sprite at any fade level covers ~49% of the QR
+       area, well past ecLevel H's ~30% recovery envelope.
+
+       2026-06-25 — Marty: smiley-emoji overlay still failing to
+       scan. Auto-detect was tripping the fallback only at >75%
+       opaque, which catches solid rectangles but MISSES SHAPED
+       LOGOS (round emoji, photo-cropped circles, multi-colour
+       icons with transparent corners). A typical smiley has ~60%
+       opaque pixels in its bounding box (yellow circle) with ~40%
+       transparent corners → opaqueRatio ~0.60, well under the
+       prior 0.75 threshold → falls into watermark at 70% size,
+       which obscures too many QR data cells regardless of fade.
+
+       Tighten to two conditions, EITHER of which forces centered
+       (10% size):
+         A) opaqueRatio > 0.50  — any logo where over half the
+            bounding box has paint. Wordmarks (typical 25-40%
+            opaque thick lettering on transparent bg) still get
+            watermark; everything denser drops to centered.
+         B) colourVariance > 0.15 — the opaque pixels span a wide
+            colour range. Wordmarks are usually monochrome (white
+            or a single brand colour); smiley emoji / photo-style
+            badges / multi-coloured icons fail this regardless of
+            opacity. Computed as: of sampled opaque pixels, count
+            how many fall outside a tight 60-band of any single
+            channel. > 15% off-channel = multi-colour, not a
+            mono-wordmark. */
     if ($style === 'watermark') {
-        $opaqueCount = 0; $totalCount = $logoW * $logoH;
+        $totalCount = $logoW * $logoH;
         if ($totalCount > 0) {
             $sampleStride = max(1, (int) sqrt($totalCount / 4000));
             $sampled = 0; $sampleOpaque = 0;
+            /* Colour-variance tracking: capture R+G+B of every
+               opaque sampled pixel, then check spread. Wordmarks
+               cluster tightly; shaped multi-colour logos spread. */
+            $opaqueRs = []; $opaqueGs = []; $opaqueBs = [];
             for ($_sy = 0; $_sy < $logoH; $_sy += $sampleStride) {
                 for ($_sx = 0; $_sx < $logoW; $_sx += $sampleStride) {
                     $sampled++;
                     $_rgba = imagecolorat($logoImg, $_sx, $_sy);
                     $_alpha = ($_rgba >> 24) & 0x7F;
-                    if ($_alpha < 100) $sampleOpaque++;
+                    if ($_alpha < 100) {
+                        $sampleOpaque++;
+                        $opaqueRs[] = ($_rgba >> 16) & 0xFF;
+                        $opaqueGs[] = ($_rgba >>  8) & 0xFF;
+                        $opaqueBs[] =  $_rgba        & 0xFF;
+                    }
                 }
             }
             $opaqueRatio = $sampled > 0 ? ($sampleOpaque / $sampled) : 0.0;
-            if ($opaqueRatio > 0.75) {
-                /* Solid-fill badge: bail to centred-with-padding so
-                   the QR stays scannable. */
+            /* Colour variance: standard deviation across the
+               combined RGB range. Mono logos hover near a single
+               point; shaped multi-colour logos sprawl. */
+            $colourVariance = 0.0;
+            if (count($opaqueRs) > 6) {
+                $meanR = array_sum($opaqueRs) / count($opaqueRs);
+                $meanG = array_sum($opaqueGs) / count($opaqueGs);
+                $meanB = array_sum($opaqueBs) / count($opaqueBs);
+                $sumSq = 0.0;
+                $n = count($opaqueRs);
+                for ($_v = 0; $_v < $n; $_v++) {
+                    $dr = $opaqueRs[$_v] - $meanR;
+                    $dg = $opaqueGs[$_v] - $meanG;
+                    $db = $opaqueBs[$_v] - $meanB;
+                    $sumSq += ($dr * $dr + $dg * $dg + $db * $db);
+                }
+                /* Normalise: max possible variance per pixel is
+                   255^2 × 3 = ~195k. Divide spread by that and
+                   take sqrt for a 0..1 scale. */
+                $colourVariance = sqrt(($sumSq / $n) / 195075.0);
+            }
+            if ($opaqueRatio > 0.50 || $colourVariance > 0.15) {
+                /* Shaped / multi-colour / dense logo: bail to
+                   centred-with-padding so the QR stays scannable. */
                 $style = 'centered';
             }
         }
