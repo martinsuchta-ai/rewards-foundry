@@ -548,13 +548,28 @@ function submitRedemption() {
         return;
       }
       if (!body || !body.ok) {
-        showMessage((body && body.error) || 'We couldn’t record your redemption. Try again in a moment.', 'err');
+        /* 2026-06-25 — Marty inverted the WBM membership gate so
+           in_wbm=false now rejects the redemption with a friendly
+           "we couldn't find you on this membership" message via
+           the body.message field. Surface that message (it's
+           hand-written) rather than the bare error slug
+           ("not_a_member", "membership_check_failed", etc.).
+           Falls back to body.error for legacy errors that don't
+           ship a message, then to a generic copy. */
+        var errMsg = (body && body.message)
+                  || (body && body.error)
+                  || 'We couldn’t record your redemption. Try again in a moment.';
+        /* not_a_member is a sticky warn — admin needs to read why. */
+        var errKind = (body && body.error === 'not_a_member') ? 'warn' : 'err';
+        showMessage(errMsg, errKind);
         return;
       }
-      /* 2026-06-23 — already_wbm_member path. The user's email/key
-         matched the linked WBM subscription, so no redemption was
-         recorded server-side. Swap to the member-state screen with
-         a personalised friendly message. */
+      /* 2026-06-23 → 2026-06-25 — already_wbm_member path retired.
+         Marty inverted the gate: WBM members now PROCEED to a
+         normal redemption (they're the only ones who can). This
+         branch never fires under the new server logic but kept
+         here as defensive fallback in case a stale server build
+         still sends the old shape. */
       if (body.already_wbm_member) {
         $('redeem-form').style.display = 'none';
         var msg = body.message || 'We recognise you on the linked Wellbeing Matters subscription — this benefit is already included.';

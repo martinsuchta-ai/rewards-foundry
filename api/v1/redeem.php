@@ -186,68 +186,110 @@ try {
     $moneyValue    = $pointsAwarded * $valuePer;
     $currency      = (string) $item['currency'];
 
-    /* ── WBM membership pre-check (2026-06-23 — Marty) ─────────────
+    /* ── WBM membership HARD GATE (2026-06-25 — Marty inverted) ────
        When the reward is linked to a WBM subscription (sub_id starts
-       SUB-), call the WBM membership endpoint with the entered email
-       or key. If the user is found on that sub, we DO NOT honour the
-       redemption — instead return a friendly already_wbm_member
-       response and let the UI show a warm message. If they aren't a
-       member (or the check fails entirely / can't reach WBM /
-       shared secret missing), fall through to the normal INSERT —
-       fail-open semantics so a network blip or misconfig can't
-       block legitimate redemptions.
+       SUB-), the entered email or key MUST match a respondent on
+       that sub's evaluation. WBM-linked rewards are member benefits,
+       not public rewards — only people inside the linked community
+       can redeem.
 
-       The WBM endpoint contract is:
+       Original 2026-06-23 logic was the opposite: in_wbm=true was a
+       SOFT BLOCK ("you're already a member, benefit included") and
+       non-members could still redeem. Marty 2026-06-25: "It should
+       not allow not linked emails or keys to redeem. Previously
+       asked to implement guard validation."
+
+       Behaviour matrix now:
+         in_wbm = true    → PROCEED to redemption insert (member)
+         in_wbm = false   → REJECT with friendly "we couldn't find
+                             you on this membership" message
+         check unreachable → REJECT (fail-CLOSED — can't validate
+                             so don't honour. Was fail-open under
+                             the soft-block spec; now we'd rather
+                             show a temporary error than let a
+                             stranger redeem during a network blip)
+         secret not set   → REJECT (config error; fail-closed)
+
+       The WBM endpoint contract is unchanged:
          GET ?secret=...&sub_id=SUB-XXX&email=foo  (or &key=YZQ...)
          → { ok:true, in_wbm:bool, respondent?, org? } */
     $itemSubId = trim((string) ($item['sub_id'] ?? ''));
     if (preg_match('/^SUB-[A-Za-z0-9]{1,32}$/', $itemSubId)) {
         $wbmSecret = (string) getenv('WBM_REWARDS_SHARED_SECRET');
-        if ($wbmSecret !== '') {
-            $checkBase = (string) (getenv('WBM_MEMBERSHIP_CHECK_URL') ?: 'https://smart-tools-foundry.com/WBM/api/wbm_membership_check.php');
-            $checkQs   = 'secret=' . urlencode($wbmSecret)
-                       . '&sub_id=' . urlencode($itemSubId)
-                       . ($email !== '' ? ('&email=' . urlencode($email)) : '')
-                       . ($key   !== '' ? ('&key='   . urlencode($key))   : '');
-            $checkRes  = null;
-            try {
-                $ch = curl_init($checkBase . '?' . $checkQs);
-                curl_setopt_array($ch, [
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_CONNECTTIMEOUT => 4,
-                    CURLOPT_TIMEOUT        => 6,
-                    CURLOPT_USERAGENT      => 'rewards-foundry/redeem',
-                ]);
-                $body = curl_exec($ch);
-                $http = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                curl_close($ch);
-                if ($http === 200 && $body !== false) {
-                    $j = json_decode((string) $body, true);
-                    if (is_array($j) && !empty($j['ok'])) $checkRes = $j;
-                }
-            } catch (Throwable $_eCheck) {
-                error_log('[redeem] WBM membership check threw: ' . $_eCheck->getMessage());
-            }
-            if (is_array($checkRes) && !empty($checkRes['in_wbm'])) {
-                $resp = is_array($checkRes['respondent'] ?? null) ? $checkRes['respondent'] : [];
-                $org  = is_array($checkRes['org']        ?? null) ? $checkRes['org']        : [];
-                $firstName = trim((string) ($resp['first_name'] ?? ''));
-                $orgName   = trim((string) ($org['name']        ?? ''));
-                $hello     = $firstName !== '' ? ('Hi ' . $firstName . '!') : 'Hi there!';
-                $msg       = $hello . ' You\'re already part of the '
-                           . ($orgName !== '' ? ($orgName . ' ') : '')
-                           . 'Wellbeing Matters community — this benefit is included with your membership, no redemption needed.';
-                rewards_json_ok([
-                    'redemption_id'       => null,
-                    'already_wbm_member'  => true,
-                    'message'             => $msg,
-                    'respondent_name'     => trim($firstName . ' ' . (string) ($resp['last_name'] ?? '')),
-                    'org_name'            => $orgName,
-                    'item_name'           => (string) $item['name'],
-                ]);
-                /* rewards_json_ok exits — control doesn't return. */
-            }
+        if ($wbmSecret === '') {
+            /* Fail-closed: a WBM-linked reward can't be validated
+               without the shared secret, so reject rather than
+               silently allow strangers in. Surface a clear error
+               so an admin can fix the rewards_secrets.php config. */
+            rewards_json_err(
+                'membership_check_misconfigured',
+                500,
+                ['message' => 'This reward is linked to a Wellbeing Matters subscription, but the membership check is not configured on this server. Please contact the admin (membership_check secret missing).']
+            );
         }
+        $checkBase = (string) (getenv('WBM_MEMBERSHIP_CHECK_URL') ?: 'https://smart-tools-foundry.com/WBM/api/wbm_membership_check.php');
+        $checkQs   = 'secret=' . urlencode($wbmSecret)
+                   . '&sub_id=' . urlencode($itemSubId)
+                   . ($email !== '' ? ('&email=' . urlencode($email)) : '')
+                   . ($key   !== '' ? ('&key='   . urlencode($key))   : '');
+        $checkRes  = null;
+        $checkErr  = '';
+        try {
+            $ch = curl_init($checkBase . '?' . $checkQs);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CONNECTTIMEOUT => 4,
+                CURLOPT_TIMEOUT        => 6,
+                CURLOPT_USERAGENT      => 'rewards-foundry/redeem',
+            ]);
+            $body = curl_exec($ch);
+            $http = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            if ($http === 200 && $body !== false) {
+                $j = json_decode((string) $body, true);
+                if (is_array($j) && !empty($j['ok'])) {
+                    $checkRes = $j;
+                } else {
+                    $checkErr = 'invalid response shape';
+                }
+            } else {
+                $checkErr = 'HTTP ' . $http;
+            }
+        } catch (Throwable $_eCheck) {
+            $checkErr = $_eCheck->getMessage();
+            error_log('[redeem] WBM membership check threw: ' . $checkErr);
+        }
+        if ($checkRes === null) {
+            /* Check infrastructure failed (network, JSON parse,
+               unexpected status). Fail-closed per the new spec
+               so a network blip can't let a stranger redeem. */
+            error_log('[redeem] WBM membership check failed for sub ' . $itemSubId . ': ' . $checkErr);
+            rewards_json_err(
+                'membership_check_failed',
+                503,
+                ['message' => 'We couldn\'t verify your Wellbeing Matters membership right now — please try again in a moment. (If this keeps happening, contact your account holder.)']
+            );
+        }
+        if (empty($checkRes['in_wbm'])) {
+            /* HARD GATE: not a member of the linked sub → reject. */
+            $orgName  = trim((string) (($checkRes['org']['name'] ?? '')));
+            $identHint = $email !== ''
+                ? ('the email you entered (' . $email . ')')
+                : ('the access code you entered');
+            $msg = 'We couldn\'t find ' . $identHint . ' on the '
+                 . ($orgName !== '' ? ($orgName . ' ') : '')
+                 . 'Wellbeing Matters membership linked to this reward. '
+                 . 'This benefit is only available to people enrolled on that membership. '
+                 . 'Please use the same email address or access code you received when you took the wellbeing evaluation.';
+            rewards_json_err('not_a_member', 403, ['message' => $msg]);
+            /* rewards_json_err exits — control doesn't return. */
+        }
+        /* in_wbm = true → fall through to normal redemption insert.
+           Stash respondent + org names on the response so the
+           success screen can read "Thanks, Audrey!" instead of
+           a generic "redeemed". */
+        $wbmRespondent = is_array($checkRes['respondent'] ?? null) ? $checkRes['respondent'] : [];
+        $wbmOrgName    = trim((string) (($checkRes['org']['name'] ?? '')));
     }
 
     /* ── Insert audit row ──────────────────────────────────────── */
