@@ -1,24 +1,19 @@
 {
   "_meta": {
-    "purpose": "Schools Pilot — Kids edition (WPK) behaviour library. Read by api/migrate/import_school_behaviours.php at Phase B.",
+    "purpose": "Schools Pilot — Kids edition (WPK) behaviour library. Read by api/migrate/import_school_behaviours.php.",
     "target_sub_id": "SUB-MOVWPL0B",
     "edition_key": "WPK",
-    "total_expected": 122,
+    "total": 122,
     "structure": "72 PERMA-H behaviours (12 per scope/direction set × 6 sets) + 25 generic UP + 25 generic DOWN",
-    "fill_status": "STARTER SHAPE — Marty to populate from the source library. Each example below shows the row format; replace the placeholder titles with the actual library text.",
-    "notes": [
-      "qr_token is NOT in this seed — the importer mints a fresh 32-char token per row.",
-      "points magnitude defaults from catalogue.default_point_bands by scope; override here only if the activity diverges (rare).",
-      "self_scan_enabled: omit to inherit the default per-direction (UP=true, DOWN=false). Override here only when needed.",
-      "dimension_key: REQUIRED for scope=ME/WE/US, OMIT for scope=GENERIC."
-    ]
+    "voice": "School-age appropriate. Spin Up: observable positive behaviours worth recognising. Spin Down: observable behaviours worth pausing on (factual, not judgmental). Refine titles to match local school vocabulary if needed.",
+    "drafted_by": "Claude — 2026-06-26 Phase B draft for Marty review",
+    "rerun_safety": "Importer skips activities already present via (consumer, sub, scope, direction, dimension, title) dedupe. Re-running after a library edit only inserts new/changed-title rows; existing rows keep their qr_token."
   },
 
   "behaviours": [
 
-    {
-      "_section": "ME · Spin Up · PERMA-H (12 behaviours total — 2 per dimension)"
-    },
+    {"_section": "ME · Spin Up · PERMA-H (12)"},
+
     { "scope": "ME", "direction": "UP", "dimension_key": "POSITIVE_EMOTIONS", "title": "Notice and name something you feel grateful for today" },
     { "scope": "ME", "direction": "UP", "dimension_key": "POSITIVE_EMOTIONS", "title": "Pause to enjoy a small win" },
     { "scope": "ME", "direction": "UP", "dimension_key": "ENGAGEMENT",        "title": "Get lost in something you love doing" },
@@ -27,53 +22,141 @@
     { "scope": "ME", "direction": "UP", "dimension_key": "RELATIONSHIPS",     "title": "Forgive yourself for a mistake" },
     { "scope": "ME", "direction": "UP", "dimension_key": "MEANING",           "title": "Do something that matters to you, even if no one sees" },
     { "scope": "ME", "direction": "UP", "dimension_key": "MEANING",           "title": "Set a tiny goal that makes a big difference" },
-    { "scope": "ME", "direction": "UP", "dimension_key": "ACCOMPLISHMENT",    "title": "Finish a task you've been putting off" },
-    { "scope": "ME", "direction": "UP", "dimension_key": "ACCOMPLISHMENT",    "title": "Try something new even though it's hard" },
+    { "scope": "ME", "direction": "UP", "dimension_key": "ACCOMPLISHMENT",    "title": "Finish a task you have been putting off" },
+    { "scope": "ME", "direction": "UP", "dimension_key": "ACCOMPLISHMENT",    "title": "Try something new even though it is hard" },
     { "scope": "ME", "direction": "UP", "dimension_key": "HEALTH",            "title": "Drink water and stretch between lessons" },
     { "scope": "ME", "direction": "UP", "dimension_key": "HEALTH",            "title": "Sleep on time tonight" },
 
-    {
-      "_section": "ME · Spin Down · PERMA-H (12 behaviours — fill from library)"
-    },
-    { "scope": "ME", "direction": "DOWN", "dimension_key": "POSITIVE_EMOTIONS", "title": "PLACEHOLDER — fill from library", "self_scan_enabled": 0 },
-    { "_section_fill_remaining": "12 ME Spin Down behaviours total, 2 per PERMA-H dimension. self_scan_enabled defaults to 0 for Spin Down." },
+    {"_section": "ME · Spin Down · PERMA-H (12)"},
 
-    {
-      "_section": "WE · Spin Up · PERMA-H (12 behaviours — fill from library; points default ±10)"
-    },
-    { "scope": "WE", "direction": "UP", "dimension_key": "RELATIONSHIPS", "title": "Help a classmate who's stuck" },
-    { "_section_fill_remaining": "12 WE Spin Up behaviours total, 2 per PERMA-H dimension." },
+    { "scope": "ME", "direction": "DOWN", "dimension_key": "POSITIVE_EMOTIONS", "title": "Spoke harshly to yourself when something went wrong" },
+    { "scope": "ME", "direction": "DOWN", "dimension_key": "POSITIVE_EMOTIONS", "title": "Stewed on a bad mood without naming what was going on" },
+    { "scope": "ME", "direction": "DOWN", "dimension_key": "ENGAGEMENT",        "title": "Distracted yourself from every task before starting" },
+    { "scope": "ME", "direction": "DOWN", "dimension_key": "ENGAGEMENT",        "title": "Skipped a practice you said you would do today" },
+    { "scope": "ME", "direction": "DOWN", "dimension_key": "RELATIONSHIPS",     "title": "Told yourself you don't matter" },
+    { "scope": "ME", "direction": "DOWN", "dimension_key": "RELATIONSHIPS",     "title": "Hid a mistake instead of owning it" },
+    { "scope": "ME", "direction": "DOWN", "dimension_key": "MEANING",           "title": "Quit something that mattered because it got hard" },
+    { "scope": "ME", "direction": "DOWN", "dimension_key": "MEANING",           "title": "Pretended you didn't care when you did" },
+    { "scope": "ME", "direction": "DOWN", "dimension_key": "ACCOMPLISHMENT",    "title": "Left a job half-finished and moved on" },
+    { "scope": "ME", "direction": "DOWN", "dimension_key": "ACCOMPLISHMENT",    "title": "Talked yourself out of trying" },
+    { "scope": "ME", "direction": "DOWN", "dimension_key": "HEALTH",            "title": "Skipped meals or rushed through them all day" },
+    { "scope": "ME", "direction": "DOWN", "dimension_key": "HEALTH",            "title": "Stayed up late on a screen when you needed sleep" },
 
-    {
-      "_section": "WE · Spin Down · PERMA-H (12 behaviours — fill from library)"
-    },
-    { "_section_fill_remaining": "12 WE Spin Down behaviours total." },
+    {"_section": "WE · Spin Up · PERMA-H (12)"},
 
-    {
-      "_section": "US · Spin Up · PERMA-H (12 behaviours — fill from library; points default ±20)"
-    },
-    { "scope": "US", "direction": "UP", "dimension_key": "MEANING", "title": "Take care of the school grounds during break" },
-    { "_section_fill_remaining": "12 US Spin Up behaviours total, 2 per PERMA-H dimension." },
+    { "scope": "WE", "direction": "UP", "dimension_key": "POSITIVE_EMOTIONS", "title": "Share what made you smile today with your class" },
+    { "scope": "WE", "direction": "UP", "dimension_key": "POSITIVE_EMOTIONS", "title": "Lift the mood when a classmate is having a hard time" },
+    { "scope": "WE", "direction": "UP", "dimension_key": "ENGAGEMENT",        "title": "Help a classmate who's stuck" },
+    { "scope": "WE", "direction": "UP", "dimension_key": "ENGAGEMENT",        "title": "Bring an idea to a group project that lifts it" },
+    { "scope": "WE", "direction": "UP", "dimension_key": "RELATIONSHIPS",     "title": "Include someone who's been left out" },
+    { "scope": "WE", "direction": "UP", "dimension_key": "RELATIONSHIPS",     "title": "Say sorry first when there's a misunderstanding" },
+    { "scope": "WE", "direction": "UP", "dimension_key": "MEANING",           "title": "Stand up for what's fair, even when it's awkward" },
+    { "scope": "WE", "direction": "UP", "dimension_key": "MEANING",           "title": "Make a quiet contribution that helps the whole class" },
+    { "scope": "WE", "direction": "UP", "dimension_key": "ACCOMPLISHMENT",    "title": "Celebrate a classmate's success out loud" },
+    { "scope": "WE", "direction": "UP", "dimension_key": "ACCOMPLISHMENT",    "title": "Push through a group challenge together" },
+    { "scope": "WE", "direction": "UP", "dimension_key": "HEALTH",            "title": "Invite a classmate to move with you at break" },
+    { "scope": "WE", "direction": "UP", "dimension_key": "HEALTH",            "title": "Look after a classmate who isn't feeling well" },
 
-    {
-      "_section": "US · Spin Down · PERMA-H (12 behaviours — fill from library)"
-    },
-    { "_section_fill_remaining": "12 US Spin Down behaviours total." },
+    {"_section": "WE · Spin Down · PERMA-H (12)"},
 
-    {
-      "_section": "GENERIC · Spin Up library (25 common positive school behaviours — points default ±5)"
-    },
+    { "scope": "WE", "direction": "DOWN", "dimension_key": "POSITIVE_EMOTIONS", "title": "Brought a sour mood into the room and let it spread" },
+    { "scope": "WE", "direction": "DOWN", "dimension_key": "POSITIVE_EMOTIONS", "title": "Mocked a classmate's enthusiasm" },
+    { "scope": "WE", "direction": "DOWN", "dimension_key": "ENGAGEMENT",        "title": "Disrupted the lesson repeatedly" },
+    { "scope": "WE", "direction": "DOWN", "dimension_key": "ENGAGEMENT",        "title": "Refused to take part in a group activity" },
+    { "scope": "WE", "direction": "DOWN", "dimension_key": "RELATIONSHIPS",     "title": "Talked behind a classmate's back" },
+    { "scope": "WE", "direction": "DOWN", "dimension_key": "RELATIONSHIPS",     "title": "Excluded someone on purpose" },
+    { "scope": "WE", "direction": "DOWN", "dimension_key": "MEANING",           "title": "Spread a rumour that hurt someone" },
+    { "scope": "WE", "direction": "DOWN", "dimension_key": "MEANING",           "title": "Stayed a bystander when something unfair was happening" },
+    { "scope": "WE", "direction": "DOWN", "dimension_key": "ACCOMPLISHMENT",    "title": "Sabotaged a classmate's work" },
+    { "scope": "WE", "direction": "DOWN", "dimension_key": "ACCOMPLISHMENT",    "title": "Took credit for someone else's effort" },
+    { "scope": "WE", "direction": "DOWN", "dimension_key": "HEALTH",            "title": "Pressured a classmate to skip the rules around food or rest" },
+    { "scope": "WE", "direction": "DOWN", "dimension_key": "HEALTH",            "title": "Teased a classmate about how they look or move" },
+
+    {"_section": "US · Spin Up · PERMA-H (12)"},
+
+    { "scope": "US", "direction": "UP", "dimension_key": "POSITIVE_EMOTIONS", "title": "Bring positive energy to a whole-school event" },
+    { "scope": "US", "direction": "UP", "dimension_key": "POSITIVE_EMOTIONS", "title": "Welcome a new student to the school" },
+    { "scope": "US", "direction": "UP", "dimension_key": "ENGAGEMENT",        "title": "Volunteer for a school-wide project or initiative" },
+    { "scope": "US", "direction": "UP", "dimension_key": "ENGAGEMENT",        "title": "Bring an idea to improve the whole school" },
+    { "scope": "US", "direction": "UP", "dimension_key": "RELATIONSHIPS",     "title": "Build a bridge between two year levels" },
+    { "scope": "US", "direction": "UP", "dimension_key": "RELATIONSHIPS",     "title": "Show younger students how things work" },
+    { "scope": "US", "direction": "UP", "dimension_key": "MEANING",           "title": "Represent the school well off-site or at events" },
+    { "scope": "US", "direction": "UP", "dimension_key": "MEANING",           "title": "Speak up for something the whole school values" },
+    { "scope": "US", "direction": "UP", "dimension_key": "ACCOMPLISHMENT",    "title": "Help with a school project that lasts beyond your year" },
+    { "scope": "US", "direction": "UP", "dimension_key": "ACCOMPLISHMENT",    "title": "Run an initiative that lifts the whole school" },
+    { "scope": "US", "direction": "UP", "dimension_key": "HEALTH",            "title": "Take care of the school grounds during break" },
+    { "scope": "US", "direction": "UP", "dimension_key": "HEALTH",            "title": "Keep shared spaces clean and welcoming" },
+
+    {"_section": "US · Spin Down · PERMA-H (12)"},
+
+    { "scope": "US", "direction": "DOWN", "dimension_key": "POSITIVE_EMOTIONS", "title": "Brought the whole-school mood down with a sour attitude" },
+    { "scope": "US", "direction": "DOWN", "dimension_key": "POSITIVE_EMOTIONS", "title": "Mocked a school-wide tradition" },
+    { "scope": "US", "direction": "DOWN", "dimension_key": "ENGAGEMENT",        "title": "Opted out of a whole-school event when everyone else was in" },
+    { "scope": "US", "direction": "DOWN", "dimension_key": "ENGAGEMENT",        "title": "Disrupted an assembly or shared moment" },
+    { "scope": "US", "direction": "DOWN", "dimension_key": "RELATIONSHIPS",     "title": "Bullied across year levels" },
+    { "scope": "US", "direction": "DOWN", "dimension_key": "RELATIONSHIPS",     "title": "Disrespected a staff member" },
+    { "scope": "US", "direction": "DOWN", "dimension_key": "MEANING",           "title": "Misrepresented the school while off-site" },
+    { "scope": "US", "direction": "DOWN", "dimension_key": "MEANING",           "title": "Trashed a school value publicly" },
+    { "scope": "US", "direction": "DOWN", "dimension_key": "ACCOMPLISHMENT",    "title": "Damaged school equipment or shared resources" },
+    { "scope": "US", "direction": "DOWN", "dimension_key": "ACCOMPLISHMENT",    "title": "Sabotaged a school-wide initiative" },
+    { "scope": "US", "direction": "DOWN", "dimension_key": "HEALTH",            "title": "Littered or vandalised school grounds" },
+    { "scope": "US", "direction": "DOWN", "dimension_key": "HEALTH",            "title": "Created unsafe conditions for younger students" },
+
+    {"_section": "GENERIC · Spin Up library (25)"},
+
     { "scope": "GENERIC", "direction": "UP", "title": "Arrived on time and ready" },
     { "scope": "GENERIC", "direction": "UP", "title": "Completed homework on time" },
     { "scope": "GENERIC", "direction": "UP", "title": "Showed kindness to a peer" },
-    { "_section_fill_remaining": "22 more GENERIC Spin Up behaviours from the library." },
+    { "scope": "GENERIC", "direction": "UP", "title": "Helped a teacher without being asked" },
+    { "scope": "GENERIC", "direction": "UP", "title": "Brought all the materials needed for class" },
+    { "scope": "GENERIC", "direction": "UP", "title": "Asked a thoughtful question" },
+    { "scope": "GENERIC", "direction": "UP", "title": "Tried again after getting it wrong" },
+    { "scope": "GENERIC", "direction": "UP", "title": "Listened carefully when someone else was speaking" },
+    { "scope": "GENERIC", "direction": "UP", "title": "Followed a school rule that was easy to break" },
+    { "scope": "GENERIC", "direction": "UP", "title": "Tidied up a shared space" },
+    { "scope": "GENERIC", "direction": "UP", "title": "Walked quietly in the corridors" },
+    { "scope": "GENERIC", "direction": "UP", "title": "Held the door open for someone" },
+    { "scope": "GENERIC", "direction": "UP", "title": "Returned something that didn't belong to you" },
+    { "scope": "GENERIC", "direction": "UP", "title": "Said please and thank you without being prompted" },
+    { "scope": "GENERIC", "direction": "UP", "title": "Joined an activity outside your usual group" },
+    { "scope": "GENERIC", "direction": "UP", "title": "Stayed focused for the full lesson" },
+    { "scope": "GENERIC", "direction": "UP", "title": "Gave honest feedback on someone's work" },
+    { "scope": "GENERIC", "direction": "UP", "title": "Asked for help when you needed it" },
+    { "scope": "GENERIC", "direction": "UP", "title": "Looked out for a younger student" },
+    { "scope": "GENERIC", "direction": "UP", "title": "Offered to help carry something heavy" },
+    { "scope": "GENERIC", "direction": "UP", "title": "Tried a new food or activity at lunchtime" },
+    { "scope": "GENERIC", "direction": "UP", "title": "Reported something unsafe to a staff member" },
+    { "scope": "GENERIC", "direction": "UP", "title": "Said hello to someone new" },
+    { "scope": "GENERIC", "direction": "UP", "title": "Picked up litter that wasn't yours" },
+    { "scope": "GENERIC", "direction": "UP", "title": "Wrote a note to thank someone" },
 
-    {
-      "_section": "GENERIC · Spin Down library (25 common negative behaviours — points default ±5)"
-    },
-    { "scope": "GENERIC", "direction": "DOWN", "title": "Disrupted the lesson repeatedly", "self_scan_enabled": 0 },
-    { "scope": "GENERIC", "direction": "DOWN", "title": "Late to class without notice",    "self_scan_enabled": 0 },
-    { "_section_fill_remaining": "23 more GENERIC Spin Down behaviours from the library." }
+    {"_section": "GENERIC · Spin Down library (25)"},
+
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Disrupted the lesson repeatedly" },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Late to class without notice" },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Did not complete homework without a good reason" },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Spoke over a teacher or classmate" },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Left a mess in a shared space" },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Used unkind language toward a peer" },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Refused to follow a reasonable instruction" },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Damaged school property carelessly" },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Lied about a small thing" },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Took something that wasn't yours" },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Excluded someone on purpose" },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Pushed or shoved in the corridor" },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Threw food or rubbish" },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Used a phone during a no-phone moment" },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Mocked a younger student" },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Was rude to a staff member" },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Refused to apologise after a clear mistake" },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Spread a rumour" },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Cheated on a piece of work" },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Pressured a peer into something they didn't want to do" },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Wandered off during a group activity" },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Broke a uniform rule on purpose" },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Used inappropriate language at school" },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Ignored a safety rule" },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Damaged a peer's belongings" }
 
   ]
 }
