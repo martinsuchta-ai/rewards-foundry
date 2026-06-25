@@ -94,9 +94,47 @@ if (!empty($result['fallback_reason'])) {
     header('X-Rewards-QR-Fallback: ' . $result['fallback_reason']);
 }
 
+/* 2026-06-25 — Marty: "At the moment the image being overlayed is
+   static per generation can we make it dynamically load so if i
+   change the image reference/link it uses that in real time on
+   the QR code".
+
+   Root cause: the previous Cache-Control: max-age=86400 told
+   browsers + edge caches to hold the rendered PNG for 24h.
+   Updating logo_url in the rewards_item row had no effect on
+   the served QR until the cache expired. The HELPER already
+   fetched the logo fresh per request — the output cache was
+   the bottleneck.
+
+   Fix: ETag-based revalidation. The ETag is a hash of the
+   inputs that change the rendered PNG (token + logo_url +
+   theme_hex + style + size). Browser sends If-None-Match on
+   every load; server returns 304 with no body when nothing
+   changed, or fresh PNG (200) when anything in the input set
+   changed. Result: a logo_url swap takes effect on the next
+   request, but unchanged QRs stay cheap to serve.
+
+   max-age=0 + must-revalidate forces the browser to send the
+   If-None-Match check on every request. private (not public)
+   keeps shared CDNs from holding the PNG either. */
+$etag = '"' . substr(hash('sha256',
+    $token . '|' . $logoUrl . '|' . $themeHex . '|' . $style . '|' . $size
+), 0, 24) . '"';
+
+header('ETag: ' . $etag);
+header('Cache-Control: private, max-age=0, must-revalidate');
+
+/* 304 short-circuit — if the browser sends If-None-Match and it
+   matches the freshly-computed ETag, skip the body. Bandwidth-
+   cheap path for unchanged QRs. */
+$ifNoneMatch = trim((string) ($_SERVER['HTTP_IF_NONE_MATCH'] ?? ''));
+if ($ifNoneMatch !== '' && $ifNoneMatch === $etag) {
+    http_response_code(304);
+    exit;
+}
+
 header('Content-Type: image/png');
 header('Content-Length: ' . strlen($png));
-header('Cache-Control: public, max-age=86400');
 if (!empty($_GET['download'])) {
     $name = 'reward-' . substr($token, 0, 8) . '.png';
     header('Content-Disposition: attachment; filename="' . $name . '"');
