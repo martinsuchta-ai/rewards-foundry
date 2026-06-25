@@ -1,0 +1,79 @@
+{
+  "_meta": {
+    "purpose": "Schools Pilot — Kids edition (WPK) behaviour library. Read by api/migrate/import_school_behaviours.php at Phase B.",
+    "target_sub_id": "SUB-MOVWPL0B",
+    "edition_key": "WPK",
+    "total_expected": 122,
+    "structure": "72 PERMA-H behaviours (12 per scope/direction set × 6 sets) + 25 generic UP + 25 generic DOWN",
+    "fill_status": "STARTER SHAPE — Marty to populate from the source library. Each example below shows the row format; replace the placeholder titles with the actual library text.",
+    "notes": [
+      "qr_token is NOT in this seed — the importer mints a fresh 32-char token per row.",
+      "points magnitude defaults from catalogue.default_point_bands by scope; override here only if the activity diverges (rare).",
+      "self_scan_enabled: omit to inherit the default per-direction (UP=true, DOWN=false). Override here only when needed.",
+      "dimension_key: REQUIRED for scope=ME/WE/US, OMIT for scope=GENERIC."
+    ]
+  },
+
+  "behaviours": [
+
+    {
+      "_section": "ME · Spin Up · PERMA-H (12 behaviours total — 2 per dimension)"
+    },
+    { "scope": "ME", "direction": "UP", "dimension_key": "POSITIVE_EMOTIONS", "title": "Notice and name something you feel grateful for today" },
+    { "scope": "ME", "direction": "UP", "dimension_key": "POSITIVE_EMOTIONS", "title": "Pause to enjoy a small win" },
+    { "scope": "ME", "direction": "UP", "dimension_key": "ENGAGEMENT",        "title": "Get lost in something you love doing" },
+    { "scope": "ME", "direction": "UP", "dimension_key": "ENGAGEMENT",        "title": "Use a strength to solve a tricky problem" },
+    { "scope": "ME", "direction": "UP", "dimension_key": "RELATIONSHIPS",     "title": "Say something kind to yourself" },
+    { "scope": "ME", "direction": "UP", "dimension_key": "RELATIONSHIPS",     "title": "Forgive yourself for a mistake" },
+    { "scope": "ME", "direction": "UP", "dimension_key": "MEANING",           "title": "Do something that matters to you, even if no one sees" },
+    { "scope": "ME", "direction": "UP", "dimension_key": "MEANING",           "title": "Set a tiny goal that makes a big difference" },
+    { "scope": "ME", "direction": "UP", "dimension_key": "ACCOMPLISHMENT",    "title": "Finish a task you've been putting off" },
+    { "scope": "ME", "direction": "UP", "dimension_key": "ACCOMPLISHMENT",    "title": "Try something new even though it's hard" },
+    { "scope": "ME", "direction": "UP", "dimension_key": "HEALTH",            "title": "Drink water and stretch between lessons" },
+    { "scope": "ME", "direction": "UP", "dimension_key": "HEALTH",            "title": "Sleep on time tonight" },
+
+    {
+      "_section": "ME · Spin Down · PERMA-H (12 behaviours — fill from library)"
+    },
+    { "scope": "ME", "direction": "DOWN", "dimension_key": "POSITIVE_EMOTIONS", "title": "PLACEHOLDER — fill from library", "self_scan_enabled": 0 },
+    { "_section_fill_remaining": "12 ME Spin Down behaviours total, 2 per PERMA-H dimension. self_scan_enabled defaults to 0 for Spin Down." },
+
+    {
+      "_section": "WE · Spin Up · PERMA-H (12 behaviours — fill from library; points default ±10)"
+    },
+    { "scope": "WE", "direction": "UP", "dimension_key": "RELATIONSHIPS", "title": "Help a classmate who's stuck" },
+    { "_section_fill_remaining": "12 WE Spin Up behaviours total, 2 per PERMA-H dimension." },
+
+    {
+      "_section": "WE · Spin Down · PERMA-H (12 behaviours — fill from library)"
+    },
+    { "_section_fill_remaining": "12 WE Spin Down behaviours total." },
+
+    {
+      "_section": "US · Spin Up · PERMA-H (12 behaviours — fill from library; points default ±20)"
+    },
+    { "scope": "US", "direction": "UP", "dimension_key": "MEANING", "title": "Take care of the school grounds during break" },
+    { "_section_fill_remaining": "12 US Spin Up behaviours total, 2 per PERMA-H dimension." },
+
+    {
+      "_section": "US · Spin Down · PERMA-H (12 behaviours — fill from library)"
+    },
+    { "_section_fill_remaining": "12 US Spin Down behaviours total." },
+
+    {
+      "_section": "GENERIC · Spin Up library (25 common positive school behaviours — points default ±5)"
+    },
+    { "scope": "GENERIC", "direction": "UP", "title": "Arrived on time and ready" },
+    { "scope": "GENERIC", "direction": "UP", "title": "Completed homework on time" },
+    { "scope": "GENERIC", "direction": "UP", "title": "Showed kindness to a peer" },
+    { "_section_fill_remaining": "22 more GENERIC Spin Up behaviours from the library." },
+
+    {
+      "_section": "GENERIC · Spin Down library (25 common negative behaviours — points default ±5)"
+    },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Disrupted the lesson repeatedly", "self_scan_enabled": 0 },
+    { "scope": "GENERIC", "direction": "DOWN", "title": "Late to class without notice",    "self_scan_enabled": 0 },
+    { "_section_fill_remaining": "23 more GENERIC Spin Down behaviours from the library." }
+
+  ]
+}
