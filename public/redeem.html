@@ -267,6 +267,105 @@ body {
   margin-top: 24px;
   padding-bottom: 12px;
 }
+/* ── 2026-06-26 Schools Pilot Phase C — behaviour flow styling.
+   When the token resolves to a behaviour_activity (not a reward
+   item), we render a different surface keyed off direction (UP =
+   green/teal, DOWN = amber) per the public schools page palette. */
+:root {
+  --schools-teal:  #0F6E56;
+  --schools-green: #639922;
+  --schools-amber: #BA7517;
+}
+.beh-hero {
+  padding: 28px 28px 22px;
+  text-align: center;
+  position: relative; overflow: hidden;
+  color: #fff;
+}
+.beh-hero.up    { background: linear-gradient(135deg, var(--schools-teal),  var(--schools-green)); }
+.beh-hero.down  { background: linear-gradient(135deg, var(--schools-amber), #7a4a0a); }
+.beh-hero .beh-direction-pill {
+  display: inline-block;
+  font-size: 10px; font-weight: 800; letter-spacing: .14em;
+  text-transform: uppercase;
+  padding: 5px 13px;
+  border-radius: 99px;
+  background: rgba(255,255,255,.22);
+  color: #fff;
+  margin-bottom: 14px;
+}
+.beh-hero .beh-scope-line {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.82);
+  margin-bottom: 8px;
+}
+.beh-hero .beh-title {
+  font-size: 19px; font-weight: 800;
+  line-height: 1.35; letter-spacing: -.005em;
+  color: #fff;
+  margin: 0 0 14px;
+}
+.beh-hero .beh-points {
+  display: inline-block;
+  font-size: 26px; font-weight: 800;
+  padding: 8px 20px; border-radius: 99px;
+  background: rgba(255,255,255,.18);
+  color: #fff;
+  letter-spacing: -.005em;
+  font-variant-numeric: tabular-nums;
+}
+.beh-source-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0 28px 16px;
+}
+.beh-source-btn {
+  background: var(--card,#fff);
+  border: 1.5px solid var(--border,#e2e8ef);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 12.5px; font-weight: 600;
+  color: var(--text-mid,#4a5f72);
+  cursor: pointer;
+  text-align: left;
+  transition: all .15s;
+  font-family: inherit;
+}
+.beh-source-btn:hover { border-color: var(--schools-teal); color: var(--schools-teal); }
+.beh-source-btn.active {
+  background: rgba(15,110,86,.05);
+  border-color: var(--schools-teal);
+  color: var(--schools-teal);
+}
+.beh-source-btn .beh-source-title { display: block; font-size: 13px; font-weight: 700; margin-bottom: 2px; color: inherit; }
+.beh-source-btn .beh-source-desc  { display: block; font-size: 11.5px; opacity: .80; line-height: 1.4; }
+@media (max-width: 480px) { .beh-source-picker { grid-template-columns: 1fr; } }
+.beh-teacher-field {
+  display: none;
+  padding: 0 28px 16px;
+}
+.beh-teacher-field.shown { display: block; }
+.beh-teacher-field .field-hint {
+  font-size: 11.5px; color: var(--text-muted,#8097ad);
+  line-height: 1.5; margin-top: 6px;
+}
+.beh-submit-up   { background: var(--schools-teal); }
+.beh-submit-up:hover   { background: #0a5a45; }
+.beh-submit-down { background: var(--schools-amber); }
+.beh-submit-down:hover { background: #9a5d12; }
+.beh-pending-notice {
+  margin: 0 28px 16px; padding: 12px 14px;
+  background: rgba(186,117,23,.06);
+  border: 1px solid rgba(186,117,23,.22);
+  border-radius: 8px;
+  font-size: 12px; color: var(--schools-amber);
+  line-height: 1.55;
+}
+.beh-pending-notice strong { font-weight: 800; }
+#success-state.pending .success-icon { background: rgba(186,117,23,.10); }
+#success-state.pending .success-icon svg { stroke: var(--schools-amber); }
 </style>
 </head>
 <body>
@@ -328,6 +427,76 @@ body {
     </div>
   </div>
 
+  <!-- 2026-06-26 — Schools Pilot Phase C behaviour form. Hidden by
+       default; loadItem() flips it on when the token resolves to a
+       behaviour_activity (kind='behaviour'). Same identifier input
+       chrome as the reward form (email / WBM key tabs) so the
+       student-side UX feels familiar. -->
+  <div id="behaviour-form" style="display:none">
+    <div class="beh-hero" id="beh-hero">
+      <div class="beh-direction-pill" id="beh-direction-pill">&mdash;</div>
+      <div class="beh-scope-line" id="beh-scope-line">&mdash;</div>
+      <div class="beh-title" id="beh-title">&mdash;</div>
+      <div class="beh-points" id="beh-points">&mdash;</div>
+    </div>
+
+    <!-- Source picker — only shown when self-scan is permitted.
+         Default state lands on TRUSTED_PERSON which is always
+         allowed. When self-scan is allowed for this behaviour the
+         student can switch to SELF_SCAN (lands as PENDING until a
+         teacher confirms via behaviour_approve.php). -->
+    <div class="beh-source-picker" id="beh-source-picker" style="display:none">
+      <button type="button" class="beh-source-btn active" id="beh-src-trusted" onclick="setBehSource('TRUSTED_PERSON')">
+        <span class="beh-source-title">I'm recording this</span>
+        <span class="beh-source-desc" id="beh-trusted-label-desc">As a Teacher</span>
+      </button>
+      <button type="button" class="beh-source-btn" id="beh-src-self" onclick="setBehSource('SELF_SCAN')">
+        <span class="beh-source-title">I'm logging it myself</span>
+        <span class="beh-source-desc">Awaits teacher confirmation</span>
+      </button>
+    </div>
+
+    <!-- Teacher email (shown only for TRUSTED_PERSON source). -->
+    <div class="beh-teacher-field shown" id="beh-teacher-field">
+      <div class="field">
+        <label for="beh-teacher-email" id="beh-teacher-label">Your email (as recorder)</label>
+        <input id="beh-teacher-email" type="email" placeholder="you@school.edu" autocomplete="email">
+        <div class="field-hint" id="beh-teacher-hint">Recorded against this award so the school can audit who confirmed it.</div>
+      </div>
+    </div>
+
+    <!-- PENDING notice (shown only for SELF_SCAN source). -->
+    <div class="beh-pending-notice" id="beh-pending-notice" style="display:none">
+      <strong>Awaits confirmation.</strong> When you submit, a teacher will need to approve before the points land in your wallet. Spin Down can't be self-scanned.
+    </div>
+
+    <div class="form-section" style="padding-top:0">
+      <div class="form-tabs" role="tablist">
+        <button type="button" class="tab-btn active" data-tab="email" onclick="setTab('email')">Email</button>
+        <button type="button" class="tab-btn" data-tab="key" onclick="setTab('key')">WBM key</button>
+      </div>
+
+      <div id="beh-msg-host"></div>
+
+      <div id="beh-tab-email">
+        <div class="field">
+          <label for="beh-inp-email">Student email</label>
+          <input id="beh-inp-email" type="email" placeholder="student@school.edu" autocomplete="off">
+        </div>
+      </div>
+
+      <div id="beh-tab-key" style="display:none">
+        <div class="field">
+          <label for="beh-inp-key">Student WBM key</label>
+          <input id="beh-inp-key" type="text" placeholder="ABC123XY" autocomplete="off" maxlength="16">
+          <div class="field-hint">The 4&ndash;16 character code from the student's Wellbeing Matters evaluation completion email.</div>
+        </div>
+      </div>
+
+      <button type="button" class="submit-btn beh-submit-up" id="beh-submit-btn" onclick="submitBehaviour()">Record</button>
+    </div>
+  </div>
+
   <!-- Success state -->
   <div id="success-state" class="success" style="display:none">
     <div class="success-icon">
@@ -378,10 +547,17 @@ function setTab(name) {
   document.querySelectorAll('.tab-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.tab === name);
   });
-  $('tab-email').style.display = (name === 'email') ? '' : 'none';
-  $('tab-key').style.display   = (name === 'key')   ? '' : 'none';
+  /* Item flow tabs. */
+  if ($('tab-email')) $('tab-email').style.display = (name === 'email') ? '' : 'none';
+  if ($('tab-key'))   $('tab-key').style.display   = (name === 'key')   ? '' : 'none';
+  /* 2026-06-26 — Schools behaviour flow tabs (same id pattern with
+     beh- prefix). Updated alongside so a tab switch on the
+     behaviour form flips its inputs too. */
+  if ($('beh-tab-email')) $('beh-tab-email').style.display = (name === 'email') ? '' : 'none';
+  if ($('beh-tab-key'))   $('beh-tab-key').style.display   = (name === 'key')   ? '' : 'none';
   /* Clear messages on tab swap so a previous error doesn't stick. */
-  $('msg-host').innerHTML = '';
+  if ($('msg-host'))     $('msg-host').innerHTML     = '';
+  if ($('beh-msg-host')) $('beh-msg-host').innerHTML = '';
 }
 
 function showMessage(text, kind) {
@@ -492,6 +668,13 @@ function applyClientBrand(client) {
   if (client.name) document.title = 'Redeem your reward · ' + client.name;
 }
 
+/* 2026-06-26 — Schools Pilot Phase C: dispatcher. The GET response
+   now carries a `kind` field that's 'item' (existing rewards
+   redemption path) or 'behaviour' (Schools Power-Up flow). Each
+   kind has its own form below; loadItem() shows the right one. */
+let _BEH_STATE = null;     /* cached behaviour payload — drives submit */
+let _behSource = 'TRUSTED_PERSON';
+
 function loadItem() {
   if (!TOKEN) { showDead('Reward link malformed', 'The link you used is missing the reward token.'); return; }
   fetch('/api/v1/redeem.php?t=' + encodeURIComponent(TOKEN), { cache: 'no-store' })
@@ -501,9 +684,19 @@ function loadItem() {
       if (status === 410)         return showDead('Reward expired', 'This reward is no longer active.');
       if (status === 422)         return showDead('Reward unavailable', body.error || 'Rewards Foundry isn’t enabled for this subscription.');
       if (!body || !body.ok)      return showDead('Reward unavailable', (body && body.error) || 'Something went wrong loading this reward.');
-      /* Apply client branding FIRST so the surface paints with the
-         correct theme before the form reveals. */
+
+      /* Apply client branding FIRST regardless of kind, so the
+         surface paints with the correct theme. */
       applyClientBrand(body.client || null);
+
+      $('loading-state').style.display = 'none';
+
+      if (body.kind === 'behaviour') {
+        renderBehaviour(body);
+        return;
+      }
+
+      /* Default: item (existing reward flow). */
       const it = body.item;
       $('reward-name').textContent = it.name;
       if (it.location) {
@@ -512,10 +705,148 @@ function loadItem() {
       }
       const pts = Number(it.points_allocated || 0);
       $('reward-points').textContent = pts + ' point' + (pts === 1 ? '' : 's');
-      $('loading-state').style.display = 'none';
-      $('redeem-form').style.display   = '';
+      $('redeem-form').style.display = '';
     })
     .catch(() => showDead('Couldn’t reach server', 'Please check your connection and refresh the page.'));
+}
+
+/* 2026-06-26 — render the Schools behaviour form. Uses the same
+   identifier tabs (email / WBM key) as the reward form so the
+   student-side UX stays familiar; adds a source picker + teacher
+   email field for the trusted-person flow. */
+function renderBehaviour(body) {
+  _BEH_STATE = body;
+  const b = body.behaviour || {};
+  const cat = body.catalogue || {};
+  const isUp = (b.direction === 'UP');
+  const terms = b.terminology || {};
+  const directionLabel = isUp ? (terms.spin_up || 'Spin Up') : (terms.spin_down || 'Spin Down');
+
+  /* Hero — direction colour cue, scope · dimension line, title, points. */
+  const hero = $('beh-hero');
+  hero.classList.toggle('up',   isUp);
+  hero.classList.toggle('down', !isUp);
+  $('beh-direction-pill').textContent = directionLabel;
+
+  let scopeLine = (b.scope_label || b.scope || '');
+  if (b.dimension_label) scopeLine += '  ·  ' + b.dimension_label;
+  $('beh-scope-line').textContent = scopeLine;
+
+  $('beh-title').textContent = b.title || '';
+
+  const sign = isUp ? '+' : '−';
+  const pts = Math.abs(Number(b.points || 0));
+  $('beh-points').textContent = sign + pts + ' point' + (pts === 1 ? '' : 's');
+
+  /* Source picker — only show when self-scan is allowed for this
+     row + catalogue policy. */
+  if (b.self_scan_allowed) {
+    $('beh-source-picker').style.display = '';
+    $('beh-trusted-label-desc').textContent = 'As a ' + (b.trusted_role_label || 'teacher');
+  } else {
+    /* Trusted-person only — picker stays hidden. */
+    $('beh-source-picker').style.display = 'none';
+    _behSource = 'TRUSTED_PERSON';
+  }
+
+  /* Update the teacher email hint to mention the trusted role. */
+  $('beh-teacher-label').textContent = 'Your email (as ' + (b.trusted_role_label || 'teacher') + ')';
+
+  /* Tune the submit button — colour + label. */
+  const submit = $('beh-submit-btn');
+  submit.classList.toggle('beh-submit-up',   isUp);
+  submit.classList.toggle('beh-submit-down', !isUp);
+  submit.textContent = 'Record ' + directionLabel;
+
+  $('behaviour-form').style.display = '';
+}
+
+function setBehSource(src) {
+  _behSource = (src === 'SELF_SCAN') ? 'SELF_SCAN' : 'TRUSTED_PERSON';
+  document.querySelectorAll('.beh-source-btn').forEach(b => {
+    b.classList.toggle('active',
+      (b.id === 'beh-src-trusted' && _behSource === 'TRUSTED_PERSON') ||
+      (b.id === 'beh-src-self'    && _behSource === 'SELF_SCAN'));
+  });
+  /* Teacher-email field + PENDING notice toggle based on source. */
+  $('beh-teacher-field').classList.toggle('shown', _behSource === 'TRUSTED_PERSON');
+  $('beh-pending-notice').style.display = (_behSource === 'SELF_SCAN') ? '' : 'none';
+  /* Submit-button label tweak — "Record Spin Up" vs "Submit Spin Up for approval". */
+  if (_BEH_STATE && _BEH_STATE.behaviour) {
+    const b = _BEH_STATE.behaviour;
+    const isUp = (b.direction === 'UP');
+    const terms = b.terminology || {};
+    const directionLabel = isUp ? (terms.spin_up || 'Spin Up') : (terms.spin_down || 'Spin Down');
+    $('beh-submit-btn').textContent = _behSource === 'SELF_SCAN'
+      ? 'Submit ' + directionLabel + ' for approval'
+      : 'Record ' + directionLabel;
+  }
+}
+
+function submitBehaviour() {
+  const btn = $('beh-submit-btn');
+  if (!_BEH_STATE) return;
+  btn.disabled = true;
+  const origLabel = btn.textContent;
+  btn.textContent = 'Submitting…';
+  $('beh-msg-host').innerHTML = '';
+
+  const email = ($('beh-inp-email').value || '').trim();
+  const key   = ($('beh-inp-key').value   || '').trim().toUpperCase();
+  const teacherEmail = ($('beh-teacher-email').value || '').trim();
+
+  const payload = { token: TOKEN, source_type: _behSource };
+  if (_activeTab === 'email') payload.participant_email = email;
+  else                        payload.participant_key   = key;
+  if (_behSource === 'TRUSTED_PERSON') payload.awarded_by_email = teacherEmail;
+
+  fetch('/api/v1/behaviour_award.php?t=' + encodeURIComponent(TOKEN), {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(payload)
+  })
+    .then(r => r.json().then(j => ({ status: r.status, body: j })))
+    .then(({ status, body }) => {
+      btn.disabled = false;
+      btn.textContent = origLabel;
+      if (!body || !body.ok) {
+        const errMsg = (body && body.message)
+                    || (body && body.error)
+                    || 'We couldn\'t record this. Try again in a moment.';
+        const errKind = (body && (body.error === 'not_a_member' || body.error === 'self_scan_not_permitted'))
+                      ? 'warn' : 'err';
+        /* Use the existing showMessage helper but target beh-msg-host. */
+        $('beh-msg-host').innerHTML = '<div class="message show ' + errKind + '">' + errMsg + '</div>';
+        return;
+      }
+      /* Success — flip to the success state. The status field tells
+         us whether it's CONFIRMED (wallet moved) or PENDING (awaiting
+         teacher confirmation). */
+      $('behaviour-form').style.display = 'none';
+      const isPending = (body.status === 'PENDING');
+      const successState = $('success-state');
+      successState.classList.toggle('pending', isPending);
+      const pts = Number(body.points_applied || 0);
+      const sign = pts >= 0 ? '+' : '';
+      const titleEl = successState.querySelector('h2');
+      const subEl   = successState.querySelector('p:not(.recorded-points-note)');
+      if (isPending) {
+        if (titleEl) titleEl.textContent = 'Submitted';
+        if (subEl)   subEl.textContent   = 'Awaiting teacher confirmation. The points will land in the wallet once approved.';
+      } else {
+        if (titleEl) titleEl.textContent = body.points_applied >= 0 ? 'Recognised' : 'Recorded';
+        if (subEl)   subEl.textContent   = 'Wallet updated.';
+      }
+      $('success-summary').innerHTML =
+        '<strong>' + sign + pts + ' point' + (Math.abs(pts) === 1 ? '' : 's') + '</strong> '
+        + (isPending ? 'pending' : 'applied');
+      successState.style.display = '';
+    })
+    .catch(() => {
+      btn.disabled = false;
+      btn.textContent = origLabel;
+      $('beh-msg-host').innerHTML = '<div class="message show err">Network error — please try again.</div>';
+    });
 }
 
 function submitRedemption() {
