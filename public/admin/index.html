@@ -21,6 +21,11 @@
 <div class="tabs">
   <button class="tab active" data-tab="items">Items</button>
   <button class="tab"        data-tab="redemptions">Redemptions</button>
+  <!-- 2026-06-26 — Schools Pilot Phase D. Behaviour catalogue admin
+       + PENDING approval queue + bulk print. Gated to catalogues
+       that exist; if no catalogues are seeded the tab still works
+       but lands on an empty state with import instructions. -->
+  <button class="tab"        data-tab="schools">Schools</button>
   <button class="tab"        data-tab="consumers">Consumers</button>
 </div>
 
@@ -84,6 +89,96 @@
     </div>
   </div>
 
+  <!-- ── SCHOOLS TAB ─────────────────────────────────────────── -->
+  <div data-pane="schools" style="display:none">
+
+    <div class="filterbar">
+      <label>Catalogue</label>
+      <select id="sch-f-catalogue" style="min-width:280px"></select>
+      <label>Scope</label>
+      <select id="sch-f-scope">
+        <option value="">All</option>
+        <option value="ME">ME</option>
+        <option value="WE">WE</option>
+        <option value="US">US</option>
+        <option value="GENERIC">GENERIC</option>
+      </select>
+      <label>Direction</label>
+      <select id="sch-f-direction">
+        <option value="">All</option>
+        <option value="UP">Spin Up</option>
+        <option value="DOWN">Spin Down</option>
+      </select>
+      <label>Search</label>
+      <input id="sch-f-q" type="text" placeholder="title contains…" style="width:220px">
+      <label><input type="checkbox" id="sch-f-inactive"> include inactive</label>
+      <button class="btn btn-sm" id="sch-refresh">Refresh</button>
+      <span style="flex:1 1 auto"></span>
+      <button class="btn btn-sm" id="sch-print-posters">A4 posters</button>
+      <button class="btn btn-sm" id="sch-print-cards">A6 cards</button>
+    </div>
+
+    <!-- Stats / overview row -->
+    <div class="kpi-row" id="sch-kpi-host" style="margin-bottom:14px"></div>
+
+    <!-- PENDING approval queue — only renders when there are any. -->
+    <div class="panel" id="sch-pending-panel" style="display:none;margin-bottom:14px;border-color:#BA7517">
+      <div class="panel-h" style="background:rgba(186,117,23,.08);color:#7a4a0a">
+        <span id="sch-pending-count">0</span> awaiting confirmation
+        <span style="font-weight:500;font-size:12px;color:var(--text-muted);margin-left:10px">
+          (students self-scanned · need teacher approval)
+        </span>
+      </div>
+      <div id="sch-pending-host"></div>
+    </div>
+
+    <!-- Activities table -->
+    <div class="panel">
+      <div id="sch-list-host">
+        <div style="padding:16px;color:var(--text-muted);font-style:italic">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  </div>
+
+<!-- ── SCHOOLS ACTIVITY EDITOR MODAL ─────────────────────────── -->
+<div class="modal-bg" id="sch-modal-bg">
+  <div class="modal">
+    <div class="modal-h" id="sch-modal-h">Edit behaviour</div>
+    <div class="form-grid">
+      <div class="form-row full">
+        <label>Title</label>
+        <input id="sch-m-title" type="text">
+      </div>
+      <div class="form-row">
+        <label>Points (magnitude)</label>
+        <input id="sch-m-points" type="number" min="1" max="999">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+          Sign applied at award time from direction.
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Scope / Direction / Dimension</label>
+        <div id="sch-m-readonly" style="font-size:13px;font-weight:600;color:var(--text-dim);padding:9px 0">—</div>
+      </div>
+      <div class="form-row full">
+        <label><input type="checkbox" id="sch-m-active"> active</label>
+      </div>
+      <div class="form-row full">
+        <label><input type="checkbox" id="sch-m-selfscan"> allow self-scan (subject to catalogue policy)</label>
+      </div>
+      <div class="form-row full">
+        <label>QR token (immutable — cards printed in field)</label>
+        <input id="sch-m-token" type="text" readonly style="font-family:ui-monospace,monospace;background:#f4f6fb">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <span style="flex:1 1 auto;color:var(--red);font-size:12px" id="sch-m-err"></span>
+      <button class="btn"             id="sch-m-cancel">Cancel</button>
+      <button class="btn btn-primary" id="sch-m-save">Save</button>
+    </div>
+  </div>
 </div>
 
 <!-- ── ITEM EDITOR MODAL ─────────────────────────────────────── -->
@@ -160,6 +255,7 @@
       if (tab === 'items')       loadItems();
       if (tab === 'redemptions') loadRedemptions();
       if (tab === 'consumers')   loadConsumers();
+      if (tab === 'schools')     loadSchools();
     });
   });
 
@@ -425,6 +521,289 @@
         + '</tr></thead><tbody>' + rows + '</tbody></table>';
     });
   }
+
+  /* ─────────────────────────────────────────────────────────────────
+     SCHOOLS TAB — Phase D management UI.
+
+     Three panels driven off the selected catalogue:
+       1. Stats KPI row (totals + today/week)
+       2. PENDING queue (only shown when there's at least one row)
+       3. Activities table (filterable, click to edit)
+
+     Plus the two print buttons that pop open schools_print.php with
+     the admin session token in the query string so the new tab can
+     auth without header plumbing.
+     ───────────────────────────────────────────────────────────── */
+  var _SCH_CATALOGUES = [];
+  var _SCH_CURRENT_ACTIVITY = null;
+  var _SCH_APPROVER_EMAIL = '';
+
+  function loadSchools() {
+    /* If catalogues haven't been fetched yet for this session, fetch
+       them; then drive the rest of the panels off whichever is
+       selected in the dropdown. */
+    var sel = document.getElementById('sch-f-catalogue');
+    if (_SCH_CATALOGUES.length === 0) {
+      RF.api('/api/admin/schools.php?action=catalogues').then(function (res) {
+        if (!res.body || !res.body.ok) {
+          document.getElementById('sch-list-host').innerHTML =
+            '<div style="padding:16px;color:var(--red)">load failed</div>';
+          return;
+        }
+        _SCH_CATALOGUES = res.body.catalogues || [];
+        if (!_SCH_CATALOGUES.length) {
+          document.getElementById('sch-list-host').innerHTML =
+            '<div style="padding:24px 16px;color:var(--text-muted);text-align:center">'
+            + '<strong>No catalogues seeded yet.</strong><br>'
+            + 'Apply migration <code>004_behaviour_catalogue.sql</code> + run '
+            + '<code>import_school_behaviours.php</code> to seed activities.'
+            + '</div>';
+          return;
+        }
+        sel.innerHTML = _SCH_CATALOGUES.map(function (c) {
+          return '<option value="' + c.id + '">'
+               + RF.esc(c.sub_id) + ' · ' + RF.esc(c.edition_key)
+               + ' · ' + RF.esc(c.consumer_name)
+               + ' (' + c.activity_count + ' activities)'
+               + '</option>';
+        }).join('');
+        sel.value = _SCH_CATALOGUES[0].id;
+        _schReloadAll();
+      });
+    } else {
+      _schReloadAll();
+    }
+  }
+
+  function _schSelectedCatalogue() {
+    var sel = document.getElementById('sch-f-catalogue');
+    var id = parseInt(sel.value || '0', 10);
+    if (!id) return null;
+    return _SCH_CATALOGUES.filter(function (c) { return c.id === id; })[0] || null;
+  }
+
+  function _schReloadAll() {
+    _schLoadStats();
+    _schLoadPending();
+    _schLoadActivities();
+  }
+
+  function _schLoadStats() {
+    var cat = _schSelectedCatalogue();
+    if (!cat) return;
+    var host = document.getElementById('sch-kpi-host');
+    RF.api('/api/admin/schools.php?action=stats&catalogue_id=' + cat.id).then(function (res) {
+      if (!res.body || !res.body.ok) return;
+      var s = res.body.stats || {};
+      var k = function (n, label, accent) {
+        return '<div class="kpi">'
+             + '<div class="kpi-v"' + (accent ? ' style="color:' + accent + '"' : '') + '>' + n + '</div>'
+             + '<div class="kpi-l">' + label + '</div>'
+             + '</div>';
+      };
+      host.innerHTML = ''
+        + k(s.activities_active + ' / ' + s.activities_total, 'active / total activities')
+        + k(s.awards_today,        'awards today')
+        + k(s.awards_this_week,    'this week')
+        + k(s.awards_confirmed_total, 'confirmed (all time)')
+        + k(s.awards_pending_total,   'pending', s.awards_pending_total > 0 ? '#BA7517' : '');
+    });
+  }
+
+  function _schLoadPending() {
+    var cat = _schSelectedCatalogue();
+    if (!cat) return;
+    var host  = document.getElementById('sch-pending-host');
+    var panel = document.getElementById('sch-pending-panel');
+    RF.api('/api/admin/schools.php?action=pending&catalogue_id=' + cat.id).then(function (res) {
+      if (!res.body || !res.body.ok) { panel.style.display = 'none'; return; }
+      var rows = res.body.pending || [];
+      if (!rows.length) { panel.style.display = 'none'; return; }
+      document.getElementById('sch-pending-count').textContent = rows.length;
+      panel.style.display = '';
+
+      var html = '<table class="tbl"><thead><tr>'
+        + '<th>Student</th><th>Behaviour</th><th>Scope</th><th>Points</th><th>When</th><th style="width:200px">Action</th>'
+        + '</tr></thead><tbody>';
+      html += rows.map(function (r) {
+        var who = r.participant_email || r.participant_key || '(no identifier)';
+        var pts = r.points >= 0 ? ('+' + r.points) : String(r.points);
+        var dirCol = r.direction === 'UP' ? '#0F6E56' : '#BA7517';
+        return '<tr>'
+          + '<td>' + RF.esc(who) + '</td>'
+          + '<td>' + RF.esc(r.behaviour_title) + '</td>'
+          + '<td><span style="font-size:11px;font-weight:700;letter-spacing:.06em;color:' + dirCol + '">'
+          +   RF.esc(r.scope_label) + (r.dimension_label ? ' · ' + RF.esc(r.dimension_label) : '') + '</span></td>'
+          + '<td style="font-weight:700;color:' + dirCol + '">' + pts + '</td>'
+          + '<td style="color:var(--text-muted);font-size:12px">' + RF.esc(r.ago) + '</td>'
+          + '<td>'
+          +   '<button class="btn btn-sm" style="background:#0F6E56;color:#fff" onclick="_schFlipPending(' + r.award_id + ',\'confirm\')">Confirm</button> '
+          +   '<button class="btn btn-sm" onclick="_schFlipPending(' + r.award_id + ',\'reject\')">Reject</button>'
+          + '</td>'
+          + '</tr>';
+      }).join('');
+      html += '</tbody></table>';
+      host.innerHTML = html;
+    });
+  }
+
+  function _schPromptApprover() {
+    if (_SCH_APPROVER_EMAIL && _SCH_APPROVER_EMAIL.indexOf('@') > 0) return _SCH_APPROVER_EMAIL;
+    var v = window.prompt('Your email (recorded as approver):', '');
+    if (!v) return null;
+    _SCH_APPROVER_EMAIL = String(v || '').trim().toLowerCase();
+    return _SCH_APPROVER_EMAIL;
+  }
+
+  window._schFlipPending = function (awardId, mode) {
+    var approver = _schPromptApprover();
+    if (!approver) return;
+    var action = mode === 'confirm' ? 'confirm_pending' : 'reject_pending';
+    RF.api('/api/admin/schools.php?action=' + action + '&id=' + awardId, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ approver_email: approver })
+    }).then(function (res) {
+      if (!res.body || !res.body.ok) {
+        alert((res.body && (res.body.message || res.body.error)) || 'Flip failed');
+        return;
+      }
+      _schReloadAll();
+    });
+  };
+
+  function _schLoadActivities() {
+    var cat = _schSelectedCatalogue();
+    if (!cat) return;
+    var host = document.getElementById('sch-list-host');
+    var qs = ['catalogue_id=' + cat.id];
+    var sc = document.getElementById('sch-f-scope').value;
+    var di = document.getElementById('sch-f-direction').value;
+    var q  = (document.getElementById('sch-f-q').value || '').trim();
+    var inc = document.getElementById('sch-f-inactive').checked;
+    if (sc)  qs.push('scope=' + encodeURIComponent(sc));
+    if (di)  qs.push('direction=' + encodeURIComponent(di));
+    if (q)   qs.push('q=' + encodeURIComponent(q));
+    if (inc) qs.push('include_inactive=1');
+    RF.api('/api/admin/schools.php?action=activities&' + qs.join('&')).then(function (res) {
+      if (!res.body || !res.body.ok) {
+        host.innerHTML = '<div style="padding:16px;color:var(--red)">load failed</div>';
+        return;
+      }
+      var rows = res.body.activities || [];
+      if (!rows.length) { host.innerHTML = '<div style="padding:16px;color:var(--text-muted)"><em>no activities match the filter</em></div>'; return; }
+      var html = '<table class="tbl"><thead><tr>'
+        + '<th style="width:60px">Scope</th><th style="width:80px">Dir</th><th>Dimension</th><th>Title</th>'
+        + '<th style="width:70px">Points</th><th style="width:60px">SelfScan</th>'
+        + '<th style="width:60px">Active</th><th style="width:80px">Awards</th><th style="width:140px">Token</th>'
+        + '</tr></thead><tbody>';
+      html += rows.map(function (r) {
+        var dirCol = r.direction === 'UP' ? '#0F6E56' : '#BA7517';
+        var dirLabel = r.direction === 'UP' ? 'Spin Up' : 'Spin Down';
+        return '<tr style="cursor:pointer" onclick="_schEditActivity(' + r.id + ')">'
+          + '<td><strong>' + RF.esc(r.scope_label) + '</strong></td>'
+          + '<td style="color:' + dirCol + ';font-weight:700">' + RF.esc(dirLabel) + '</td>'
+          + '<td>' + RF.esc(r.dimension_label || '—') + '</td>'
+          + '<td>' + RF.esc(r.title) + '</td>'
+          + '<td style="font-weight:700;color:' + dirCol + '">' + (r.direction === 'UP' ? '+' : '−') + r.points + '</td>'
+          + '<td>' + (r.self_scan_enabled ? '<span class="pill on">on</span>' : '<span class="pill off">off</span>') + '</td>'
+          + '<td>' + (r.active ? '<span class="pill on">on</span>' : '<span class="pill off">off</span>') + '</td>'
+          + '<td>' + r.awards_count + '</td>'
+          + '<td style="font-family:ui-monospace,monospace;font-size:11px;color:var(--text-muted)">' + RF.esc(String(r.qr_token).slice(0, 12)) + '…</td>'
+          + '</tr>';
+      }).join('');
+      html += '</tbody></table>';
+      host.innerHTML = html;
+    });
+  }
+
+  window._schEditActivity = function (id) {
+    /* Pull the row from the last list (we cached it via the DOM
+       fetch; easier to re-query the API for the single row to
+       avoid stale state). */
+    RF.api('/api/admin/schools.php?action=activities&catalogue_id=' + _schSelectedCatalogue().id + '&include_inactive=1').then(function (res) {
+      if (!res.body || !res.body.ok) return;
+      var rows = res.body.activities || [];
+      var r = rows.filter(function (x) { return x.id === id; })[0];
+      if (!r) return;
+      _SCH_CURRENT_ACTIVITY = r;
+      document.getElementById('sch-modal-h').textContent = 'Edit behaviour';
+      document.getElementById('sch-m-title').value = r.title;
+      document.getElementById('sch-m-points').value = r.points;
+      document.getElementById('sch-m-active').checked = !!r.active;
+      document.getElementById('sch-m-selfscan').checked = !!r.self_scan_enabled;
+      document.getElementById('sch-m-token').value = r.qr_token;
+      document.getElementById('sch-m-readonly').textContent =
+        r.scope_label + '  ·  ' + (r.direction === 'UP' ? 'Spin Up' : 'Spin Down')
+        + (r.dimension_label ? '  ·  ' + r.dimension_label : '');
+      document.getElementById('sch-m-err').textContent = '';
+      document.getElementById('sch-modal-bg').classList.add('open');
+    });
+  };
+
+  document.getElementById('sch-m-cancel').addEventListener('click', function () {
+    document.getElementById('sch-modal-bg').classList.remove('open');
+  });
+  document.getElementById('sch-m-save').addEventListener('click', function () {
+    if (!_SCH_CURRENT_ACTIVITY) return;
+    var body = {
+      title: document.getElementById('sch-m-title').value,
+      points: parseInt(document.getElementById('sch-m-points').value, 10),
+      active: document.getElementById('sch-m-active').checked,
+      self_scan_enabled: document.getElementById('sch-m-selfscan').checked
+    };
+    RF.api('/api/admin/schools.php?action=update_activity&id=' + _SCH_CURRENT_ACTIVITY.id, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body)
+    }).then(function (res) {
+      if (!res.body || !res.body.ok) {
+        document.getElementById('sch-m-err').textContent =
+          (res.body && (res.body.message || res.body.error)) || 'Save failed';
+        return;
+      }
+      document.getElementById('sch-modal-bg').classList.remove('open');
+      _schLoadActivities();
+      _schLoadStats();
+    });
+  });
+
+  /* Filter + refresh wiring. */
+  document.getElementById('sch-f-catalogue').addEventListener('change', _schReloadAll);
+  document.getElementById('sch-f-scope').addEventListener('change', _schLoadActivities);
+  document.getElementById('sch-f-direction').addEventListener('change', _schLoadActivities);
+  document.getElementById('sch-f-inactive').addEventListener('change', _schLoadActivities);
+  document.getElementById('sch-f-q').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') _schLoadActivities();
+  });
+  document.getElementById('sch-refresh').addEventListener('click', _schReloadAll);
+
+  /* Print buttons — open a new tab with the admin_session token in
+     the query string so the print page can auth without headers. */
+  function _schPrintUrl(layout) {
+    var cat = _schSelectedCatalogue();
+    if (!cat) return null;
+    var token = (function () {
+      try { return JSON.parse(localStorage.getItem('rewards_admin_session') || '{}').token || ''; }
+      catch (_e) { return ''; }
+    })();
+    var qs = ['catalogue_id=' + cat.id, 'layout=' + layout];
+    /* Carry the current filters into the print sheet too. */
+    var sc = document.getElementById('sch-f-scope').value;
+    var di = document.getElementById('sch-f-direction').value;
+    var inc = document.getElementById('sch-f-inactive').checked;
+    if (sc)  qs.push('scope=' + encodeURIComponent(sc));
+    if (di)  qs.push('direction=' + encodeURIComponent(di));
+    if (inc) qs.push('include_inactive=1');
+    if (token) qs.push('admin_session=' + encodeURIComponent(token));
+    return '/api/admin/schools_print.php?' + qs.join('&');
+  }
+  document.getElementById('sch-print-posters').addEventListener('click', function () {
+    var url = _schPrintUrl('a4_posters'); if (url) window.open(url, '_blank');
+  });
+  document.getElementById('sch-print-cards').addEventListener('click', function () {
+    var url = _schPrintUrl('a6_cards'); if (url) window.open(url, '_blank');
+  });
 })();
 </script>
 </body>
