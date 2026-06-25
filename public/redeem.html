@@ -366,6 +366,19 @@ body {
 .beh-pending-notice strong { font-weight: 800; }
 #success-state.pending .success-icon { background: rgba(186,117,23,.10); }
 #success-state.pending .success-icon svg { stroke: var(--schools-amber); }
+
+/* When the behaviour form is rendered we tag the body so the
+   tab active color flips from the legacy orange to the schools
+   teal — matches the Spin Up hero gradient and reads as one
+   coherent surface. */
+body.behaviour-mode .tab-btn.active {
+  background: var(--schools-teal);
+  border-color: var(--schools-teal);
+}
+body.behaviour-mode.direction-down .tab-btn.active {
+  background: var(--schools-amber);
+  border-color: var(--schools-amber);
+}
 </style>
 </head>
 <body>
@@ -721,6 +734,11 @@ function renderBehaviour(body) {
   const isUp = (b.direction === 'UP');
   const terms = b.terminology || {};
   const directionLabel = isUp ? (terms.spin_up || 'Spin Up') : (terms.spin_down || 'Spin Down');
+
+  /* Tag the body so the tab active colour flips off the legacy
+     orange (per the orange→teal cosmetic fix). */
+  document.body.classList.add('behaviour-mode');
+  document.body.classList.toggle('direction-down', !isUp);
 
   /* Hero — direction colour cue, scope · dimension line, title, points. */
   const hero = $('beh-hero');
