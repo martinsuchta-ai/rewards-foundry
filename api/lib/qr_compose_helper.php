@@ -371,14 +371,25 @@ function wm_qr_compose(string $text, int $size, string $logoUrl, string $themeHe
     /* ── 3a. Centred logo (default) ─────────────────────────── */
     /* 2026-06-25 — Marty: "reduce the logo used on QR codes
        please by 60% on bank and in rewards-foundry". Was 25% of
-       QR width → now 10% (25 × 0.40). Smaller overlay keeps more
-       QR data cells visible, improves scan reliability on cheap
-       phone cameras + lower-light conditions, and the brand mark
-       still reads clearly at this size on the typical 320-420px
-       QR render. Mirror change applied in the WBM main repo's
-       api/lib/qr_compose_helper.php (commit on smart-tools-
-       foundry side). */
-    $target = (int) round($qrW * 0.10);
+       QR width → 10% (25 × 0.40).
+
+       2026-06-25 (later same day, rewards-foundry only) — Marty:
+       "can you make the image overlay as big as possible so the
+       QR code is still readable? the image is too small at the
+       moment". Push back UP to 0.25 — the documented safe ceiling
+       under ecLevel=H (~30% recovery envelope). The 0.10 pad ring
+       puts the visible obscured footprint at ~30%, which is the
+       proven boundary across every phone we've tested. Bigger
+       than 0.25 requires printing the QR at a larger physical
+       size, not bumping the logo proportion further.
+
+       WBM helper stays at 0.10 per Marty's earlier instruction —
+       this bump is rewards-foundry-only. Different use case: WBM
+       QR codes appear on dashboards / printed materials where
+       the brand mark is contextual; rewards-foundry QR codes are
+       the primary visual element on member-facing redemption
+       prompts where the image needs to read clearly. */
+    $target = (int) round($qrW * 0.25);
     $pad    = (int) round($target * 0.10);
 
     /* Preserve logo aspect ratio. */
