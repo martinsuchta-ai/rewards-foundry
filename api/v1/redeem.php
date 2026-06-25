@@ -46,7 +46,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
    page can render before the user submits. Mirrors the WBM dual-
    purpose pattern in rewards_redeem.php (GET = render, POST = act).
    Public-safe means: nothing about the consumer, no internal ids,
-   no redemption history. */
+   no redemption history.
+
+   2026-06-26 — Schools Pilot Phase C. The token now resolves to
+   EITHER a rewards_item OR a rewards_behaviour_activity. The
+   response carries a `kind` discriminator so the redeem.html page
+   knows which UI to render:
+     - kind="item"      → existing reward flow (POST to /v1/redeem.php)
+     - kind="behaviour" → schools behaviour flow (POST to /v1/behaviour_award.php)
+   We try items FIRST (more common path); falls through to
+   behaviour_activity if no item matches. */
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $token = trim((string) ($_GET['t'] ?? ''));
     if ($token === '' || !preg_match('/^[A-Za-z0-9_\-]{16,64}$/', $token)) {
@@ -68,26 +77,101 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     } catch (Throwable $e) {
         rewards_safe_error_response($e, 'item lookup failed');
     }
-    if (!$item) rewards_json_err('reward not found', 404);
-    if ((int) $item['is_active'] !== 1) rewards_json_err('reward no longer active', 410);
-    /* client = denormalised brand surface from the item row. The
-       redeem.html page's applyClientBrand() takes theme_primary +
-       logo_url + name; we don't carry an org name on the item (yet)
-       so client.name is left empty -- the page falls back gracefully. */
+
+    if ($item) {
+        if ((int) $item['is_active'] !== 1) rewards_json_err('reward no longer active', 410);
+        rewards_json_ok([
+            'kind' => 'item',
+            'item' => [
+                'name'                       => (string) $item['name'],
+                'location'                   => (string) ($item['location'] ?? ''),
+                'points_allocated'           => (int)    $item['points_allocated'],
+                'money_value_per_point'      => (float)  $item['money_value_per_point'],
+                'currency'                   => (string) $item['currency'],
+                'max_redemptions_per_person' => $item['max_redemptions_per_person'] !== null
+                                                  ? (int) $item['max_redemptions_per_person']
+                                                  : null,
+            ],
+            'client' => [
+                'theme_primary' => (string) ($item['theme_primary_hex'] ?? ''),
+                'logo_url'      => (string) ($item['logo_url']          ?? ''),
+                'name'          => '',
+                'theme_key'     => '',
+            ],
+        ]);
+    }
+
+    /* ── Token didn't match an item. Try behaviour activity. ────── */
+    try {
+        $st2 = $pdo->prepare(
+            "SELECT a.`id`, a.`sub_id`, a.`catalogue_id`,
+                    a.`scope`, a.`direction`, a.`dimension_key`,
+                    a.`title`, a.`points`, a.`self_scan_enabled`,
+                    a.`theme_primary_hex`, a.`active`,
+                    c.`edition_key`, c.`scope_labels`, c.`dimension_labels`,
+                    c.`trusted_role_label`, c.`terminology`,
+                    c.`self_scan_policy`
+               FROM `rewards_behaviour_activity` a
+               JOIN `rewards_behaviour_catalogue` c ON c.`id` = a.`catalogue_id`
+              WHERE a.`qr_token` = ? LIMIT 1"
+        );
+        $st2->execute([$token]);
+        $bx = $st2->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        rewards_safe_error_response($e, 'behaviour lookup failed');
+    }
+    if (!$bx) rewards_json_err('reward not found', 404);
+    if ((int) $bx['active'] !== 1) rewards_json_err('behaviour no longer active', 410);
+
+    $scopeLabels = json_decode((string) $bx['scope_labels'],     true) ?: [];
+    $dimLabels   = json_decode((string) $bx['dimension_labels'], true) ?: [];
+    $terms       = json_decode((string) $bx['terminology'],      true) ?: [];
+
+    $dim = (string) ($bx['dimension_key'] ?? '');
+    $scope = (string) $bx['scope'];
+    $direction = (string) $bx['direction'];
+
+    /* Resolve whether self-scan is ACTUALLY allowed for this row,
+       folding in the catalogue policy. Logic:
+         policy=never        → false
+         policy=spin_up_only → row's self_scan_enabled AND direction=UP
+         policy=allow        → row's self_scan_enabled
+       The redeem.html UI uses this to decide which mode picker to render. */
+    $policy = (string) $bx['self_scan_policy'];
+    $rowAllows = ((int) $bx['self_scan_enabled']) === 1;
+    if ($policy === 'never') {
+        $selfScanAllowed = false;
+    } elseif ($policy === 'spin_up_only') {
+        $selfScanAllowed = $rowAllows && ($direction === 'UP');
+    } else {
+        $selfScanAllowed = $rowAllows;
+    }
+
     rewards_json_ok([
-        'item' => [
-            'name'                       => (string) $item['name'],
-            'location'                   => (string) ($item['location'] ?? ''),
-            'points_allocated'           => (int)    $item['points_allocated'],
-            'money_value_per_point'      => (float)  $item['money_value_per_point'],
-            'currency'                   => (string) $item['currency'],
-            'max_redemptions_per_person' => $item['max_redemptions_per_person'] !== null
-                                              ? (int) $item['max_redemptions_per_person']
-                                              : null,
+        'kind' => 'behaviour',
+        'behaviour' => [
+            'scope'              => $scope,
+            'scope_label'        => (string) ($scopeLabels[$scope] ?? $scope),
+            'direction'          => $direction,
+            'dimension_key'      => $dim !== '' ? $dim : null,
+            'dimension_label'    => $dim !== '' ? (string) ($dimLabels[$dim] ?? $dim) : null,
+            'title'              => (string) $bx['title'],
+            'points'             => (int) $bx['points'],     /* MAGNITUDE — sign comes from direction */
+            'self_scan_allowed'  => $selfScanAllowed,
+            'trusted_role_label' => (string) $bx['trusted_role_label'],
+            'terminology'        => [
+                'spin_up'   => (string) ($terms['spin_up']   ?? 'Spin Up'),
+                'spin_down' => (string) ($terms['spin_down'] ?? 'Spin Down'),
+            ],
+        ],
+        'catalogue' => [
+            'sub_id'           => (string) $bx['sub_id'],
+            'edition_key'      => (string) $bx['edition_key'],
+            'self_scan_policy' => $policy,
         ],
         'client' => [
-            'theme_primary' => (string) ($item['theme_primary_hex'] ?? ''),
-            'logo_url'      => (string) ($item['logo_url']          ?? ''),
+            'theme_primary' => (string) ($bx['theme_primary_hex'] ?? ''),
+            'logo_url'      => '',
             'name'          => '',
             'theme_key'     => '',
         ],
