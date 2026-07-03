@@ -21,8 +21,9 @@ RewriteRule ^(.+?)/?$ /$1.html [L]
   Header unset Server
 </IfModule>
 
-# Cache static assets for a week; HTML for 5 minutes so updates
-# propagate promptly when the redemption page changes.
+# Cache static assets for a week. HTML is excluded — it has no ?v=
+# versioning, so caching let SG's edge cache serve a stale redemption
+# page after an edit. See the no-store block below.
 <IfModule mod_expires.c>
   ExpiresActive On
   ExpiresByType image/png            "access plus 7 days"
@@ -32,5 +33,17 @@ RewriteRule ^(.+?)/?$ /$1.html [L]
   ExpiresByType font/woff2           "access plus 30 days"
   ExpiresByType text/css             "access plus 1 day"
   ExpiresByType application/javascript "access plus 1 day"
-  ExpiresByType text/html            "access plus 5 minutes"
+</IfModule>
+
+# 2026-07-03 — Force no-store on HTML so the SG edge cache never masks
+# an edit with a stale document. Ctrl+Shift+R reuses the same edge key
+# so it doesn't help; only a ?v= query (a new key) dodged it.
+<IfModule mod_headers.c>
+  <FilesMatch "\.html$">
+    Header always set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+    Header always set Pragma "no-cache"
+    Header always set Expires "0"
+    Header always unset ETag
+    FileETag None
+  </FilesMatch>
 </IfModule>
