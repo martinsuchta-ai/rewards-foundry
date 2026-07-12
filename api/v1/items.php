@@ -93,8 +93,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     `points_allocated`, `money_value_per_point`, `currency`,
                     `max_redemptions_per_person`,
                     `qr_token`, `theme_primary_hex`, `logo_url`, `redeem_image_url`,
-                    `is_active`, `created_by_email`)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                    `enforce_account`, `is_active`, `created_by_email`)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
             );
             $ins->execute([
                 (int)   $consumer['id'],
@@ -110,6 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 isset($body['theme_primary_hex']) ? trim((string) $body['theme_primary_hex']) : null,
                 isset($body['logo_url'])          ? trim((string) $body['logo_url'])          : null,
                 isset($body['redeem_image_url'])  ? trim((string) $body['redeem_image_url'])  : null,
+                array_key_exists('enforce_account', $body) ? (!empty($body['enforce_account']) ? 1 : 0) : 0,
                 array_key_exists('is_active', $body) ? (!empty($body['is_active']) ? 1 : 0) : 1,
                 isset($body['created_by_email']) ? trim((string) $body['created_by_email']) : null,
             ]);
@@ -140,7 +141,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach ([
             'name', 'location', 'points_allocated', 'money_value_per_point',
             'currency', 'max_redemptions_per_person',
-            'theme_primary_hex', 'logo_url', 'redeem_image_url', 'is_active'
+            'theme_primary_hex', 'logo_url', 'redeem_image_url', 'enforce_account', 'is_active'
         ] as $k) {
             if (!array_key_exists($k, $body)) continue;
             $v = $body[$k];
@@ -148,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($k === 'points_allocated') $v = (int) $v;
             if ($k === 'money_value_per_point') $v = (float) $v;
             if ($k === 'max_redemptions_per_person') $v = ($v === '' || $v === null) ? null : (int) $v;
-            if ($k === 'is_active') $v = !empty($v) ? 1 : 0;
+            if ($k === 'is_active' || $k === 'enforce_account') $v = !empty($v) ? 1 : 0;
             if (is_string($v) && in_array($k, ['name','location','theme_primary_hex','logo_url','redeem_image_url'], true)) {
                 $v = trim($v);
                 if ($k === 'name' && $v === '') continue;   /* never blank-name */
@@ -234,7 +235,7 @@ try {
     $sql = "SELECT i.`id`, i.`sub_id`, i.`name`, i.`location`,
                    i.`points_allocated`, i.`money_value_per_point`, i.`currency`,
                    i.`max_redemptions_per_person`, i.`qr_token`,
-                   i.`theme_primary_hex`, i.`logo_url`, i.`redeem_image_url`,
+                   i.`theme_primary_hex`, i.`logo_url`, i.`redeem_image_url`, i.`enforce_account`,
                    i.`is_active`, i.`created_at`, i.`updated_at`, i.`created_by_email`,
                    (SELECT COUNT(*) FROM `rewards_redemption` r
                       WHERE r.`rewards_item_id` = i.`id`) AS `redemption_count`

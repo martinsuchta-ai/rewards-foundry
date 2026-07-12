@@ -398,7 +398,7 @@ body.behaviour-mode.direction-down .tab-btn.active {
       <div class="client-logo-chip" id="client-logo-chip"><img id="client-logo-img" alt=""></div>
       <div class="client-name-line" id="client-name-line">&mdash;</div>
       <div class="title" id="reward-name">&mdash;</div>
-      <div class="subtitle">Enter your email or your Wellbeing Matters key to record your redemption.</div>
+      <div class="subtitle" id="reward-subtitle">Enter your email or your Wellbeing Matters key to record your redemption.</div>
     </div>
 
     <!-- 2026-06-19 — Marty: "Also the value in $ amount can we removed
@@ -722,6 +722,17 @@ function loadItem() {
       }
       const pts = Number(it.points_allocated || 0);
       $('reward-points').textContent = pts + ' point' + (pts === 1 ? '' : 's');
+      /* Enforce-account (Require Credentials on the sub) → email only:
+         hide the WBM-key tab (and the whole tab row, since only Email
+         remains) and force the email panel. The server also rejects a
+         key for these items. */
+      if (body.enforce_account) {
+        const keyBtn = document.querySelector('.form-tabs .tab-btn[data-tab="key"]');
+        if (keyBtn && keyBtn.parentNode) keyBtn.parentNode.style.display = 'none';
+        if ($('tab-key')) $('tab-key').style.display = 'none';
+        setTab('email');
+        if ($('reward-subtitle')) $('reward-subtitle').textContent = 'Enter your email address to record your redemption.';
+      }
       $('redeem-form').style.display = '';
     })
     .catch(() => showDead('Couldn’t reach server', 'Please check your connection and refresh the page.'));

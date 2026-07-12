@@ -68,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     i.`points_allocated`, i.`money_value_per_point`, i.`currency`,
                     i.`max_redemptions_per_person`,
                     i.`theme_primary_hex`, i.`logo_url`, i.`redeem_image_url`,
-                    i.`is_active`
+                    i.`enforce_account`, i.`is_active`
                FROM `rewards_item` i
               WHERE i.`qr_token` = ? LIMIT 1"
         );
@@ -82,6 +82,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         if ((int) $item['is_active'] !== 1) rewards_json_err('reward no longer active', 410);
         rewards_json_ok([
             'kind' => 'item',
+            /* Require Credentials on the sub → email-only redemption; the
+               page hides the WBM-key tab and the POST rejects a key. */
+            'enforce_account' => (int) ($item['enforce_account'] ?? 0) === 1,
             'item' => [
                 'name'                       => (string) $item['name'],
                 'location'                   => (string) ($item['location'] ?? ''),
@@ -239,7 +242,7 @@ try {
     $st = $pdo->prepare(
         "SELECT i.`id`, i.`consumer_id`, i.`sub_id`, i.`name`,
                 i.`points_allocated`, i.`money_value_per_point`, i.`currency`,
-                i.`max_redemptions_per_person`, i.`is_active`
+                i.`max_redemptions_per_person`, i.`enforce_account`, i.`is_active`
            FROM `rewards_item` i
           WHERE i.`qr_token` = ? LIMIT 1"
     );
@@ -247,6 +250,12 @@ try {
     $item = $st->fetch(PDO::FETCH_ASSOC);
     if (!$item) rewards_json_err('reward not found', 404);
     if ((int) $item['is_active'] !== 1) rewards_json_err('reward no longer active', 410);
+
+    /* Enforce-account: this sub requires an email — reject key redemption
+       server-side (the page also hides the key tab, but never trust the UI). */
+    if ((int) ($item['enforce_account'] ?? 0) === 1 && $key !== '') {
+        rewards_json_err('this reward can only be redeemed with an email address', 422);
+    }
 
     /* ── Per-person cap (when set) ─────────────────────────────── */
     $cap = $item['max_redemptions_per_person'];

@@ -162,6 +162,7 @@ $validate_fields = function (array $b, bool $forCreate): array {
         $out['max_redemptions_per_person'] = ($v === null || $v === '') ? null : (int) $v;
     }
     if (array_key_exists('is_active', $b)) $out['is_active'] = !empty($b['is_active']) ? 1 : 0;
+    if (array_key_exists('enforce_account', $b)) $out['enforce_account'] = !empty($b['enforce_account']) ? 1 : 0;
     return $out;
 };
 
@@ -192,8 +193,8 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 `points_allocated`, `money_value_per_point`, `currency`,
                 `max_redemptions_per_person`,
                 `qr_token`, `theme_primary_hex`, `logo_url`, `redeem_image_url`,
-                `is_active`, `created_by_email`)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                `enforce_account`, `is_active`, `created_by_email`)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
         );
         $ins->execute([
             $f['consumer_id'],
@@ -208,6 +209,7 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                     ($f['theme_primary_hex'] ?? null),
                     ($f['logo_url']          ?? null),
                     ($f['redeem_image_url']  ?? null),
+            isset($f['enforce_account']) ? $f['enforce_account'] : 0,
             isset($f['is_active']) ? $f['is_active'] : 1,
             $by,
         ]);
@@ -244,7 +246,7 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
        for an UPDATE call. */
     $cols = []; $args = [];
     foreach (['name','location','points_allocated','money_value_per_point','currency',
-              'max_redemptions_per_person','theme_primary_hex','logo_url','redeem_image_url','is_active'] as $k) {
+              'max_redemptions_per_person','theme_primary_hex','logo_url','redeem_image_url','enforce_account','is_active'] as $k) {
         if (array_key_exists($k, $f)) {
             $cols[] = '`' . $k . '` = ?';
             $args[] = $f[$k];
