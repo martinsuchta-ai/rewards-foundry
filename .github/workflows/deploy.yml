@@ -55,6 +55,7 @@ jobs:
               -X README.md \
               -X CLAUDE.md \
               -X .gitignore \
+              -X uploads/ \
               ./public/ /rewards-foundry.com/public_html/;
             mirror -R --no-perms --delete --verbose \
               -X .git/ -X .github/ -X .vscode/ -X .claude/ \

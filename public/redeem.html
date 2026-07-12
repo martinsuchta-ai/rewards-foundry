@@ -667,9 +667,13 @@ function applyClientBrand(client) {
       return '/api/v1/logo_proxy.php?url=' + encodeURIComponent(url);
     } catch (_e) { return url; }
   }
-  if (client.logo_url) {
-    $('client-logo-img').src = _logoSrc(client.logo_url);
-    $('client-logo-img').alt = (client.name || '') + ' logo';
+  /* Redemption-page image: prefer the dedicated redeem_image_url
+     (migration 006); fall back to logo_url (the QR-page image) so
+     existing items keep their look until an admin sets a redeem image. */
+  var _redeemImg = (client.redeem_image_url || '').trim() || (client.logo_url || '').trim();
+  if (_redeemImg) {
+    $('client-logo-img').src = _logoSrc(_redeemImg);
+    $('client-logo-img').alt = (client.name || '') + ' reward image';
     hero.classList.add('has-logo');
   }
   if (client.name) {

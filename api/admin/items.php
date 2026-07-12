@@ -135,7 +135,7 @@ $validate_fields = function (array $b, bool $forCreate): array {
     if ($forCreate && $name === '') rewards_json_err('name required', 400);
     if ($name !== '') $out['name'] = mb_substr($name, 0, 160);
 
-    foreach (['location', 'theme_primary_hex', 'logo_url'] as $k) {
+    foreach (['location', 'theme_primary_hex', 'logo_url', 'redeem_image_url'] as $k) {
         if (array_key_exists($k, $b)) $out[$k] = $b[$k] === null ? null : trim((string) $b[$k]);
     }
     if (isset($out['theme_primary_hex']) && $out['theme_primary_hex'] !== '' && $out['theme_primary_hex'] !== null) {
@@ -191,9 +191,9 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                (`consumer_id`, `sub_id`, `name`, `location`,
                 `points_allocated`, `money_value_per_point`, `currency`,
                 `max_redemptions_per_person`,
-                `qr_token`, `theme_primary_hex`, `logo_url`,
+                `qr_token`, `theme_primary_hex`, `logo_url`, `redeem_image_url`,
                 `is_active`, `created_by_email`)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
         );
         $ins->execute([
             $f['consumer_id'],
@@ -207,6 +207,7 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $token,
                     ($f['theme_primary_hex'] ?? null),
                     ($f['logo_url']          ?? null),
+                    ($f['redeem_image_url']  ?? null),
             isset($f['is_active']) ? $f['is_active'] : 1,
             $by,
         ]);
@@ -243,7 +244,7 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
        for an UPDATE call. */
     $cols = []; $args = [];
     foreach (['name','location','points_allocated','money_value_per_point','currency',
-              'max_redemptions_per_person','theme_primary_hex','logo_url','is_active'] as $k) {
+              'max_redemptions_per_person','theme_primary_hex','logo_url','redeem_image_url','is_active'] as $k) {
         if (array_key_exists($k, $f)) {
             $cols[] = '`' . $k . '` = ?';
             $args[] = $f[$k];

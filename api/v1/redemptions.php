@@ -79,7 +79,7 @@ if ($action === 'list') {
     try {
         $st = $pdo->prepare(
             "SELECT r.`id`, r.`redeemed_at`,
-                    r.`rewards_item_id`, i.`name` AS `item_name`,
+                    r.`rewards_item_id`, i.`name` AS `item_name`, i.`location` AS `item_location`,
                     r.`sub_id`,
                     r.`redeemer_email`, r.`redeemer_key`,
                     r.`points_awarded`, r.`money_value`, r.`currency`,

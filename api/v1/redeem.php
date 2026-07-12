@@ -67,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             "SELECT i.`name`, i.`location`,
                     i.`points_allocated`, i.`money_value_per_point`, i.`currency`,
                     i.`max_redemptions_per_person`,
-                    i.`theme_primary_hex`, i.`logo_url`,
+                    i.`theme_primary_hex`, i.`logo_url`, i.`redeem_image_url`,
                     i.`is_active`
                FROM `rewards_item` i
               WHERE i.`qr_token` = ? LIMIT 1"
@@ -93,10 +93,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                                                   : null,
             ],
             'client' => [
-                'theme_primary' => (string) ($item['theme_primary_hex'] ?? ''),
-                'logo_url'      => (string) ($item['logo_url']          ?? ''),
-                'name'          => '',
-                'theme_key'     => '',
+                'theme_primary'    => (string) ($item['theme_primary_hex'] ?? ''),
+                'logo_url'         => (string) ($item['logo_url']          ?? ''),
+                /* Dedicated redemption-page image (migration 006). The
+                   page prefers this; when empty it falls back to logo_url
+                   so existing items keep their current look. */
+                'redeem_image_url' => (string) ($item['redeem_image_url']  ?? ''),
+                'name'             => '',
+                'theme_key'        => '',
             ],
         ]);
     }
