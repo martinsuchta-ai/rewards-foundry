@@ -61,18 +61,27 @@ if (!function_exists('rewards_store_uploaded_image')) {
             $err = 'could not create upload directory'; return null;
         }
 
-        /* One-time hardening: nothing under uploads/ ever executes. */
+        /* Hardening: nothing under uploads/ ever executes. Must be FPM-SAFE —
+           SiteGround runs PHP as FPM/CGI, where a bare `php_flag` directive in
+           .htaccess makes Apache 500 EVERY request in the directory (including
+           the static images themselves → broken links). So we disable PHP with
+           mod_mime (RemoveHandler/AddType) + an authz deny, never php_flag.
+           Written whenever the file is missing OR its content differs, so a
+           previously-shipped bad .htaccess self-heals on the next upload (the
+           deploy mirror excludes uploads/, so it can't be fixed by a deploy). */
         $hardened = $uploadsRoot . '/.htaccess';
-        if (!is_file($hardened)) {
-            @file_put_contents(
-                $hardened,
-                "# Auto-generated — reward image uploads are static assets only.\n"
-                . "php_flag engine off\n"
-                . "<IfModule mod_php.c>\n  php_admin_flag engine off\n</IfModule>\n"
-                . "RemoveHandler .php .phtml .php3 .php4 .php5 .php7 .phps\n"
-                . "AddType text/plain .php .phtml .php3 .php4 .php5 .php7 .phps\n"
-            );
-        }
+        $desiredHtaccess =
+              "# Auto-generated — reward image uploads are static assets only.\n"
+            . "# FPM-safe: no php_flag (SiteGround runs PHP-FPM; php_flag 500s the dir).\n"
+            . "RemoveHandler .php .phtml .php3 .php4 .php5 .php7 .phps\n"
+            . "AddType text/plain .php .phtml .php3 .php4 .php5 .php7 .phps\n"
+            . "<IfModule mod_authz_core.c>\n"
+            . "  <FilesMatch \"\\.(php|phtml|php3|php4|php5|php7|phps)$\">\n"
+            . "    Require all denied\n"
+            . "  </FilesMatch>\n"
+            . "</IfModule>\n";
+        $curHtaccess = @is_file($hardened) ? (string) @file_get_contents($hardened) : '';
+        if ($curHtaccess !== $desiredHtaccess) { @file_put_contents($hardened, $desiredHtaccess); }
 
         try { $rand = bin2hex(random_bytes(12)); }
         catch (Throwable $e) { $rand = substr(hash('sha256', uniqid('', true)), 0, 24); }
