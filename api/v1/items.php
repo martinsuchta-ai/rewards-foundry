@@ -137,19 +137,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         /* Build SET clause from supplied editable fields. consumer_id,
            sub_id, qr_token, legacy_wbm_id are immutable. */
+        /* `archived` (migration 008) may be absent on older deploys — probe so
+           an archive/unarchive request degrades gracefully before it's run. */
+        $hasArchivedCol = false;
+        try {
+            $hasArchivedCol = ((int) $pdo->query(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS
+                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rewards_item' AND COLUMN_NAME = 'archived'"
+            )->fetchColumn()) > 0;
+        } catch (Throwable $_eAc) { $hasArchivedCol = false; }
         $cols = []; $args = [];
         foreach ([
             'name', 'location', 'points_allocated', 'money_value_per_point',
             'currency', 'max_redemptions_per_person',
-            'theme_primary_hex', 'logo_url', 'redeem_image_url', 'enforce_account', 'is_active'
+            'theme_primary_hex', 'logo_url', 'redeem_image_url', 'enforce_account', 'is_active', 'archived'
         ] as $k) {
+            if ($k === 'archived' && !$hasArchivedCol) continue;
             if (!array_key_exists($k, $body)) continue;
             $v = $body[$k];
             if ($k === 'currency')        $v = $v === null ? null : strtoupper(trim((string) $v));
             if ($k === 'points_allocated') $v = (int) $v;
             if ($k === 'money_value_per_point') $v = (float) $v;
             if ($k === 'max_redemptions_per_person') $v = ($v === '' || $v === null) ? null : (int) $v;
-            if ($k === 'is_active' || $k === 'enforce_account') $v = !empty($v) ? 1 : 0;
+            if ($k === 'is_active' || $k === 'enforce_account' || $k === 'archived') $v = !empty($v) ? 1 : 0;
             if (is_string($v) && in_array($k, ['name','location','theme_primary_hex','logo_url','redeem_image_url'], true)) {
                 $v = trim($v);
                 if ($k === 'name' && $v === '') continue;   /* never blank-name */
@@ -229,20 +239,36 @@ if ($subId === '' || !preg_match('/^[A-Za-z0-9_\-]{1,64}$/', $subId)) {
     rewards_json_err('sub_id required (alphanumeric / dash / underscore, 1-64 chars)', 400);
 }
 $includeInactive = !empty($_GET['include_inactive']);
+/* 2026-07-14 — archived items are hidden from the default list; the bank
+   Rewards client passes include_archived=1 and filters client-side (mirrors
+   the include_inactive pattern) so it can offer a "Show archived" toggle.
+   The `archived` column may not exist on older deploys (migration 008) — probe
+   it so this endpoint degrades gracefully before the migration is run. */
+$includeArchived = !empty($_GET['include_archived']);
+$hasArchived = false;
+try {
+    $hasArchived = ((int) rewards_db()->query(
+        "SELECT COUNT(*) FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rewards_item' AND COLUMN_NAME = 'archived'"
+    )->fetchColumn()) > 0;
+} catch (Throwable $_eA) { $hasArchived = false; }
 
 try {
     $pdo = rewards_db();
+    $archCol    = $hasArchived ? "i.`archived`," : "0 AS `archived`,";
+    $archFilter = ($hasArchived && !$includeArchived) ? 'AND i.`archived` = 0' : '';
     $sql = "SELECT i.`id`, i.`sub_id`, i.`name`, i.`location`,
                    i.`points_allocated`, i.`money_value_per_point`, i.`currency`,
                    i.`max_redemptions_per_person`, i.`qr_token`,
                    i.`theme_primary_hex`, i.`logo_url`, i.`redeem_image_url`, i.`enforce_account`,
-                   i.`is_active`, i.`created_at`, i.`updated_at`, i.`created_by_email`,
+                   i.`is_active`, $archCol i.`created_at`, i.`updated_at`, i.`created_by_email`,
                    (SELECT COUNT(*) FROM `rewards_redemption` r
                       WHERE r.`rewards_item_id` = i.`id`) AS `redemption_count`
               FROM `rewards_item` i
              WHERE i.`consumer_id` = ?
                AND i.`sub_id`      = ?
             " . ($includeInactive ? '' : 'AND i.`is_active` = 1') . "
+            " . $archFilter . "
              ORDER BY i.`created_at` DESC";
     $stmt = $pdo->prepare($sql);
     $stmt->execute([(int) $consumer['id'], $subId]);
