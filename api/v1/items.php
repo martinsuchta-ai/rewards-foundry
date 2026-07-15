@@ -192,10 +192,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                regardless of how many columns actually mutated. If it
                doesn't, the id genuinely doesn't exist for this
                consumer and we 404. */
+            $uHasVoided = false;
+            try {
+                $uHasVoided = ((int) $pdo->query(
+                    "SELECT COUNT(*) FROM information_schema.COLUMNS
+                      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rewards_redemption' AND COLUMN_NAME = 'voided'"
+                )->fetchColumn()) > 0;
+            } catch (Throwable $_eUV) { $uHasVoided = false; }
+            $uVoidFilter = $uHasVoided ? "AND rr.`voided` = 0" : '';
             $st = $pdo->prepare(
                 "SELECT i.*,
                         (SELECT COUNT(*) FROM `rewards_redemption` rr
-                           WHERE rr.`rewards_item_id` = i.`id`) AS `redemption_count`
+                           WHERE rr.`rewards_item_id` = i.`id` $uVoidFilter) AS `redemption_count`
                    FROM `rewards_item` i
                   WHERE i.`id` = ? AND i.`consumer_id` = ?"
             );
@@ -253,6 +261,16 @@ try {
     )->fetchColumn()) > 0;
 } catch (Throwable $_eA) { $hasArchived = false; }
 
+/* Voided redemptions (migration 009) must NOT inflate an item's
+   redemption_count. Probe the column so this degrades before the migration. */
+$hasVoided = false;
+try {
+    $hasVoided = ((int) rewards_db()->query(
+        "SELECT COUNT(*) FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rewards_redemption' AND COLUMN_NAME = 'voided'"
+    )->fetchColumn()) > 0;
+} catch (Throwable $_eV) { $hasVoided = false; }
+$voidFilter = $hasVoided ? "AND r.`voided` = 0" : '';
 try {
     $pdo = rewards_db();
     $archCol    = $hasArchived ? "i.`archived`," : "0 AS `archived`,";
@@ -263,7 +281,7 @@ try {
                    i.`theme_primary_hex`, i.`logo_url`, i.`redeem_image_url`, i.`enforce_account`,
                    i.`is_active`, $archCol i.`created_at`, i.`updated_at`, i.`created_by_email`,
                    (SELECT COUNT(*) FROM `rewards_redemption` r
-                      WHERE r.`rewards_item_id` = i.`id`) AS `redemption_count`
+                      WHERE r.`rewards_item_id` = i.`id` $voidFilter) AS `redemption_count`
               FROM `rewards_item` i
              WHERE i.`consumer_id` = ?
                AND i.`sub_id`      = ?
