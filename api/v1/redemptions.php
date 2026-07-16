@@ -58,6 +58,19 @@ try {
     )->fetchColumn()) > 0;
 } catch (Throwable $e) { $hasVoided = false; }
 
+/* hsa_eligible lands in migration 010 — same probe, same reason. The WBM
+   export segments on this (All / HSA-Eligible / HSA-Non-Eligible): HSA-eligible
+   points are the ones handed to the client's external system for a real credit
+   into the participant's HSA. Filter: ?hsa=eligible|non|all (default all). */
+$hasHsa = false;
+try {
+    $hasHsa = ((int) $pdo->query(
+        "SELECT COUNT(*) FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rewards_item'
+            AND COLUMN_NAME = 'hsa_eligible'"
+    )->fetchColumn()) > 0;
+} catch (Throwable $e) { $hasHsa = false; }
+
 /* Body params for POST mutations — accept JSON or form, fall back to query. */
 $_body = [];
 if ($method === 'POST') {
@@ -75,9 +88,16 @@ $param = function (string $k, $default = null) use ($_body) {
 /* Shared WHERE — always consumer_id-scoped + sub_id-scoped. Voided rows are
    EXCLUDED by default; ?voided=only shows only voided, ?voided=all shows both
    (include_voided=1 is a legacy alias for 'all'). */
-$buildFilter = function () use ($consumer, $subId, $hasVoided): array {
+$buildFilter = function () use ($consumer, $subId, $hasVoided, $hasHsa): array {
     $where = ['r.`consumer_id` = ?', 'r.`sub_id` = ?'];
     $args  = [(int) $consumer['id'], $subId];
+    if ($hasHsa) {
+        /* ?hsa=eligible -> only items flagged HSA-eligible; ?hsa=non -> only
+           those not flagged. Anything else (incl. absent) = all. */
+        $hf = strtolower(trim((string) ($_GET['hsa'] ?? '')));
+        if ($hf === 'eligible')            $where[] = 'i.`hsa_eligible` = 1';
+        elseif ($hf === 'non' || $hf === 'non-eligible') $where[] = 'i.`hsa_eligible` = 0';
+    }
     if ($hasVoided) {
         $vf  = strtolower(trim((string) ($_GET['voided'] ?? '')));
         $all = ($vf === 'all') || !empty($_GET['include_voided']);
@@ -112,6 +132,7 @@ if ($action === 'list') {
     if ($limit > 5000) $limit = 5000;
 
     $voidCols = $hasVoided ? ", r.`voided`, r.`void_reason`, r.`voided_at`, r.`voided_by`" : '';
+    $hsaCols  = $hasHsa    ? ", i.`hsa_eligible`" : '';
     try {
         $st = $pdo->prepare(
             "SELECT r.`id`, r.`redeemed_at`,
@@ -119,7 +140,7 @@ if ($action === 'list') {
                     r.`sub_id`,
                     r.`redeemer_email`, r.`redeemer_key`,
                     r.`points_awarded`, r.`money_value`, r.`currency`,
-                    r.`user_agent`" . $voidCols . "
+                    r.`user_agent`" . $voidCols . $hsaCols . "
                FROM `rewards_redemption` r
                JOIN `rewards_item`       i ON i.`id` = r.`rewards_item_id`
               WHERE $where
