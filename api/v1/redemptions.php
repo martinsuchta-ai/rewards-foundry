@@ -257,4 +257,142 @@ if ($action === 'void' || $action === 'unvoid') {
     rewards_json_ok(['id' => $id, 'action' => $action, 'voided' => ($action === 'void')]);
 }
 
+/* ── action=manual_award ───────────────────────────────────────────────────
+   2026-07-17 (Marty). The QR-failure fallback. The client is retiring the
+   paper attendance sheet, so when a scan fails there was previously NO way to
+   award a person their points short of direct DB access.
+
+   Re-uses the reward definition: same item, same points_allocated, same
+   money_value_per_point — an admin cannot invent a value, only attribute an
+   existing reward to a person. That keeps manual awards inside the client's
+   agreed schedule.
+
+   Deliberately NOT reusing /v1/redeem.php: that path is authenticated BY the
+   qr_token (the token IS the credential) and carries the WBM membership hard
+   gate + per-IP rate limit, all aimed at a participant scanning their own
+   phone. This is an authenticated admin acting on someone else's behalf —
+   different actor, different auth (consumer key), different audit needs.
+
+   POST { item_id, email, actor }  — actor = the admin doing it. */
+if ($action === 'manual_award') {
+    if ($method !== 'POST') rewards_json_err('POST required', 405);
+
+    $itemId = (int) $param('item_id', 0);
+    $email  = strtolower(trim((string) $param('email', '')));
+    $actor  = trim((string) $param('actor', ''));
+
+    if ($itemId <= 0) rewards_json_err('item_id required', 400);
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        rewards_json_err('a valid email is required — it is the key the external system credits', 400);
+    }
+    if ($actor === '') rewards_json_err('actor required — a manual award must record who made it', 400);
+
+    /* Item must exist, be active, and belong to THIS consumer + sub. Never
+       trust an item_id from the client. */
+    $st = $pdo->prepare("SELECT `id`, `name`, `points_allocated`, `money_value_per_point`, `currency`, `is_active`
+                           FROM `rewards_item`
+                          WHERE `id` = ? AND `consumer_id` = ? AND `sub_id` = ? LIMIT 1");
+    $st->execute([$itemId, (int) $consumer['id'], $subId]);
+    $item = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$item)                      rewards_json_err('reward not found for this subscription', 404);
+    if ((int) $item['is_active'] !== 1) rewards_json_err('that reward is not active', 409);
+
+    $points = (int) $item['points_allocated'];
+    $money  = round($points * (float) $item['money_value_per_point'], 4);
+
+    /* Provenance columns land in mig012 — probe so this deploys ahead of it. */
+    $hasSrc = false;
+    try {
+        $hasSrc = ((int) $pdo->query(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rewards_redemption'
+                AND COLUMN_NAME = 'award_source'"
+        )->fetchColumn()) > 0;
+    } catch (Throwable $e) { $hasSrc = false; }
+    if (!$hasSrc) rewards_json_err('manual awards need migration 012 — run api/migrate/run.php', 409);
+
+    try {
+        $ins = $pdo->prepare(
+            "INSERT INTO `rewards_redemption`
+               (`consumer_id`, `rewards_item_id`, `sub_id`, `redeemer_email`,
+                `points_awarded`, `money_value`, `currency`,
+                `award_source`, `awarded_by_email`, `redeemed_at`)
+             VALUES (?,?,?,?,?,?,?, 'MANUAL', ?, UTC_TIMESTAMP())"
+        );
+        $ins->execute([
+            (int) $consumer['id'], $itemId, $subId, $email,
+            $points, $money, (string) $item['currency'], $actor,
+        ]);
+        $newId = (int) $pdo->lastInsertId();
+    } catch (Throwable $e) {
+        rewards_safe_error_response($e, 'manual award failed');
+    }
+
+    try {
+        $hasAudit = ((int) $pdo->query(
+            "SELECT COUNT(*) FROM information_schema.TABLES
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rewards_audit'"
+        )->fetchColumn()) > 0;
+        if ($hasAudit) {
+            $pdo->prepare("INSERT INTO `rewards_audit`
+                             (`actor_admin_user_id`, `action`, `entity_type`, `entity_id`, `details`)
+                           VALUES (NULL, 'redemption_manual_award', 'rewards_redemption', ?, ?)")
+                ->execute([$newId, json_encode([
+                    'actor'  => $actor, 'email' => $email, 'sub_id' => $subId,
+                    'item_id' => $itemId, 'item' => $item['name'],
+                    'points' => $points, 'money' => $money,
+                ], JSON_UNESCAPED_SLASHES)]);
+        }
+    } catch (Throwable $e) { /* non-fatal */ }
+
+    rewards_json_ok([
+        'id' => $newId, 'email' => $email, 'item' => $item['name'],
+        'points' => $points, 'money_value' => $money,
+        'currency' => $item['currency'], 'awarded_by' => $actor,
+    ]);
+}
+
+/* ── action=delete ─────────────────────────────────────────────────────────
+   2026-07-17 (Marty) — super-admin hard delete. Distinct from void: void keeps
+   the row and its history (the normal correction), delete removes it entirely.
+   Use only to purge test/erroneous data. */
+if ($action === 'delete') {
+    if ($method !== 'POST') rewards_json_err('POST required', 405);
+    $id    = (int) $param('id', 0);
+    $actor = trim((string) $param('actor', 'bank-super-admin'));
+    if ($id <= 0) rewards_json_err('id required', 400);
+
+    $st = $pdo->prepare("SELECT `id`, `redeemer_email`, `points_awarded`, `money_value`
+                           FROM `rewards_redemption`
+                          WHERE `id` = ? AND `consumer_id` = ? AND `sub_id` = ? LIMIT 1");
+    $st->execute([$id, (int) $consumer['id'], $subId]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$row) rewards_json_err('redemption not found for this subscription', 404);
+
+    /* Audit BEFORE the delete — afterwards there is nothing left to describe. */
+    try {
+        $hasAudit = ((int) $pdo->query(
+            "SELECT COUNT(*) FROM information_schema.TABLES
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rewards_audit'"
+        )->fetchColumn()) > 0;
+        if ($hasAudit) {
+            $pdo->prepare("INSERT INTO `rewards_audit`
+                             (`actor_admin_user_id`, `action`, `entity_type`, `entity_id`, `details`)
+                           VALUES (NULL, 'redemption_delete', 'rewards_redemption', ?, ?)")
+                ->execute([$id, json_encode([
+                    'actor' => $actor, 'sub_id' => $subId,
+                    'deleted_row' => $row,
+                ], JSON_UNESCAPED_SLASHES)]);
+        }
+    } catch (Throwable $e) { /* non-fatal */ }
+
+    try {
+        $pdo->prepare("DELETE FROM `rewards_redemption` WHERE `id` = ? AND `consumer_id` = ? AND `sub_id` = ?")
+            ->execute([$id, (int) $consumer['id'], $subId]);
+    } catch (Throwable $e) {
+        rewards_safe_error_response($e, 'delete failed');
+    }
+    rewards_json_ok(['id' => $id, 'deleted' => true]);
+}
+
 rewards_json_err('unknown action: ' . $action, 400);
