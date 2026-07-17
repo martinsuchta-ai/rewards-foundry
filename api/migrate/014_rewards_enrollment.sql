@@ -13,12 +13,12 @@
 --   * status  — redemption is GATED on this (Marty 2026-07-18):
 --       'active'     = may redeem
 --       'suspended'  = temporarily blocked from redeeming (reversible)
---       'unenrolled' = removed from the programme (soft-delete; kept for audit)
+--       'unenrolled' = removed from the programme (soft-delete, kept for audit)
 --
 -- A person's first-ever transaction auto-creates an ACTIVE system row, so the
--- first redemption is never blocked; an admin suspend/unenrol blocks subsequent
--- ones. Email is the identity key (manual enrol collects first/last/email);
--- system rows resolve the email from the WBM membership check even on key-only
+-- first redemption is never blocked. An admin suspend/unenrol blocks subsequent
+-- ones. Email is the identity key (manual enrol collects first/last/email).
+-- System rows resolve the email from the WBM membership check even on key-only
 -- redemptions. Email is stored already-lowercased by the app, so a plain
 -- UNIQUE(sub_id,email) enforces one row per person per sub.
 -- ─────────────────────────────────────────────────────────────────
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS `rewards_enrollment` (
     `last_name`     VARCHAR(128)    NULL,
     `source`        ENUM('system','manual')                 NOT NULL DEFAULT 'system',
     `status`        ENUM('active','suspended','unenrolled') NOT NULL DEFAULT 'active',
-    `created_by`    VARCHAR(255)    NULL COMMENT 'admin email for manual rows; NULL/system for auto',
+    `created_by`    VARCHAR(255)    NULL COMMENT 'admin email for manual rows, NULL for system/auto',
     `created_at`    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
