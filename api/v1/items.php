@@ -68,6 +68,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $pdo = rewards_db();
 
     /* CREATE ───────────────────────────────────────────────── */
+    /* allow_enrollment (migration 015) may be absent on older deploys — probe
+       once so create/update degrade gracefully before the migration is run. */
+    $hasAllowEnrolCol = false;
+    try {
+        $hasAllowEnrolCol = ((int) $pdo->query(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rewards_item' AND COLUMN_NAME = 'allow_enrollment'"
+        )->fetchColumn()) > 0;
+    } catch (Throwable $_eAe) { $hasAllowEnrolCol = false; }
+
     if ($action === 'create') {
         $subId = trim((string) ($body['sub_id'] ?? ''));
         $name  = trim((string) ($body['name']   ?? ''));
@@ -87,16 +97,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($token === '') rewards_json_err('qr_token mint failed', 500);
 
         try {
+            $aeColName = $hasAllowEnrolCol ? ', `allow_enrollment`' : '';
+            $aePlace   = $hasAllowEnrolCol ? ', ?' : '';
             $ins = $pdo->prepare(
                 "INSERT INTO `rewards_item`
                    (`consumer_id`, `sub_id`, `name`, `location`,
                     `points_allocated`, `money_value_per_point`, `currency`,
                     `max_redemptions_per_person`,
                     `qr_token`, `theme_primary_hex`, `logo_url`, `redeem_image_url`,
-                    `enforce_account`, `is_active`, `created_by_email`)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                    `enforce_account`, `is_active`, `created_by_email`" . $aeColName . ")
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?" . $aePlace . ")"
             );
-            $ins->execute([
+            $insParams = [
                 (int)   $consumer['id'],
                 $subId,
                 mb_substr($name, 0, 160),
@@ -113,7 +125,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 array_key_exists('enforce_account', $body) ? (!empty($body['enforce_account']) ? 1 : 0) : 0,
                 array_key_exists('is_active', $body) ? (!empty($body['is_active']) ? 1 : 0) : 1,
                 isset($body['created_by_email']) ? trim((string) $body['created_by_email']) : null,
-            ]);
+            ];
+            if ($hasAllowEnrolCol) {
+                $insParams[] = array_key_exists('allow_enrollment', $body) ? (!empty($body['allow_enrollment']) ? 1 : 0) : 0;
+            }
+            $ins->execute($insParams);
             $id = (int) $pdo->lastInsertId();
 
             $st = $pdo->prepare(
@@ -150,16 +166,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach ([
             'name', 'location', 'points_allocated', 'money_value_per_point',
             'currency', 'max_redemptions_per_person',
-            'theme_primary_hex', 'logo_url', 'redeem_image_url', 'enforce_account', 'is_active', 'archived'
+            'theme_primary_hex', 'logo_url', 'redeem_image_url', 'enforce_account', 'is_active', 'archived', 'allow_enrollment'
         ] as $k) {
             if ($k === 'archived' && !$hasArchivedCol) continue;
+            if ($k === 'allow_enrollment' && !$hasAllowEnrolCol) continue;
             if (!array_key_exists($k, $body)) continue;
             $v = $body[$k];
             if ($k === 'currency')        $v = $v === null ? null : strtoupper(trim((string) $v));
             if ($k === 'points_allocated') $v = (int) $v;
             if ($k === 'money_value_per_point') $v = (float) $v;
             if ($k === 'max_redemptions_per_person') $v = ($v === '' || $v === null) ? null : (int) $v;
-            if ($k === 'is_active' || $k === 'enforce_account' || $k === 'archived') $v = !empty($v) ? 1 : 0;
+            if ($k === 'is_active' || $k === 'enforce_account' || $k === 'archived' || $k === 'allow_enrollment') $v = !empty($v) ? 1 : 0;
             if (is_string($v) && in_array($k, ['name','location','theme_primary_hex','logo_url','redeem_image_url'], true)) {
                 $v = trim($v);
                 if ($k === 'name' && $v === '') continue;   /* never blank-name */
