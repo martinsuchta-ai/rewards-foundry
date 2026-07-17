@@ -63,12 +63,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     }
     try {
         $pdo = rewards_db();
+        /* allow_enrollment lands in migration 015 — probe so this endpoint
+           is safe to deploy AHEAD of the migration (column absent → flag
+           reads false, the redeem page just doesn't show the enrol area). */
+        $hasAllowEnrol = false;
+        try {
+            $hasAllowEnrol = ((int) $pdo->query(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS
+                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rewards_item'
+                    AND COLUMN_NAME = 'allow_enrollment'"
+            )->fetchColumn()) > 0;
+        } catch (Throwable $e) { $hasAllowEnrol = false; }
+        $aeCol = $hasAllowEnrol ? ", i.`allow_enrollment`" : '';
         $st = $pdo->prepare(
             "SELECT i.`name`, i.`location`,
                     i.`points_allocated`, i.`money_value_per_point`, i.`currency`,
                     i.`max_redemptions_per_person`,
                     i.`theme_primary_hex`, i.`logo_url`, i.`redeem_image_url`,
-                    i.`enforce_account`, i.`is_active`
+                    i.`enforce_account`, i.`is_active`" . $aeCol . "
                FROM `rewards_item` i
               WHERE i.`qr_token` = ? LIMIT 1"
         );
@@ -85,6 +97,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             /* Require Credentials on the sub → email-only redemption; the
                page hides the WBM-key tab and the POST rejects a key. */
             'enforce_account' => (int) ($item['enforce_account'] ?? 0) === 1,
+            /* Self-enrolment at the rewards location (migration 015) — when
+               true the redeem page shows a "Not enrolled yet? Enrol now"
+               affordance that enrols the visitor + awards this item. */
+            'allow_enrollment' => ((int) ($item['allow_enrollment'] ?? 0) === 1),
             'item' => [
                 'name'                       => (string) $item['name'],
                 'location'                   => (string) ($item['location'] ?? ''),

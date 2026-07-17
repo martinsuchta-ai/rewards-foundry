@@ -51,8 +51,9 @@ function rewards_enrollment_tables_ready(PDO $pdo): bool {
  */
 function rewards_enrollment_resolve(PDO $pdo, string $subId, string $email,
                                     ?string $first = null, ?string $last = null,
-                                    ?int $consumerId = null): array {
+                                    ?int $consumerId = null, string $source = 'system'): array {
     $email = strtolower(trim($email));
+    if (!in_array($source, ['system', 'manual', 'location'], true)) $source = 'system';
     $out = ['status' => null, 'created' => false, 'email' => $email, 'id' => 0];
     if ($subId === '' || $email === '') return $out;
     if (!rewards_enrollment_tables_ready($pdo)) return $out;   /* fail-open pre-migration */
@@ -81,13 +82,14 @@ function rewards_enrollment_resolve(PDO $pdo, string $subId, string $email,
             return ['status' => (string) $row['status'], 'created' => false, 'email' => $email, 'id' => (int) $row['id']];
         }
 
-        /* No row → auto-create an ACTIVE system enrolment. */
+        /* No row → auto-create an ACTIVE enrolment with the caller's source
+           ('system' on a transaction, 'location' on a self-enrol). */
         $ins = $pdo->prepare(
             "INSERT INTO `rewards_enrollment`
                (`consumer_id`, `sub_id`, `email`, `first_name`, `last_name`, `source`, `status`)
-             VALUES (?, ?, ?, ?, ?, 'system', 'active')"
+             VALUES (?, ?, ?, ?, ?, ?, 'active')"
         );
-        $ins->execute([$consumerId, $subId, $email, $first, $last]);
+        $ins->execute([$consumerId, $subId, $email, $first, $last, $source]);
         return ['status' => 'active', 'created' => true, 'email' => $email, 'id' => (int) $pdo->lastInsertId()];
     } catch (Throwable $e) {
         /* Unique-key race (another request just created it) → re-read.

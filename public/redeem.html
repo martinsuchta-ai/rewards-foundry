@@ -437,6 +437,24 @@ body.behaviour-mode.direction-down .tab-btn.active {
       </div>
 
       <button type="button" class="submit-btn" id="submit-btn" onclick="submitRedemption()">Redeem this reward</button>
+
+      <!-- Self-enrolment at the rewards location (allow_enrollment, mig 015).
+           loadItem() reveals this when the reward's sub allows it. -->
+      <div id="enrol-area" style="display:none;margin-top:20px;padding-top:16px;border-top:1px solid var(--border-light,#e6e6e6)">
+        <div id="enrol-prompt" style="text-align:center">
+          <div style="font-size:13px;color:var(--text-muted);margin-bottom:9px">Not enrolled yet?</div>
+          <button type="button" class="submit-btn" id="enrol-open-btn" onclick="toggleEnrolForm(true)" style="background:transparent;color:var(--orange);border:2px solid var(--orange)">Enrol now &amp; get this reward</button>
+        </div>
+        <div id="enrol-form" style="display:none">
+          <div style="font-size:13px;color:var(--text-muted);margin:2px 0 14px;line-height:1.5">Join this rewards programme and we&rsquo;ll record this reward for you. Enter your email twice so we get it right.</div>
+          <div class="field"><label for="enrol-first">First name</label><input id="enrol-first" type="text" autocomplete="given-name"></div>
+          <div class="field"><label for="enrol-last">Last name</label><input id="enrol-last" type="text" autocomplete="family-name"></div>
+          <div class="field"><label for="enrol-email">Email address</label><input id="enrol-email" type="email" placeholder="you@example.com" autocomplete="email"></div>
+          <div class="field"><label for="enrol-email2">Confirm email address</label><input id="enrol-email2" type="email" placeholder="you@example.com" autocomplete="off" onpaste="return false"></div>
+          <button type="button" class="submit-btn" id="enrol-submit-btn" onclick="submitEnrolAtLocation()">Enrol &amp; claim reward</button>
+          <div style="text-align:center;margin-top:10px"><a href="#" onclick="toggleEnrolForm(false);return false" style="font-size:12px;color:var(--text-muted);text-decoration:none">Cancel</a></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -733,6 +751,11 @@ function loadItem() {
         setTab('email');
         if ($('reward-subtitle')) $('reward-subtitle').textContent = 'Enter your email address to record your redemption.';
       }
+      /* Self-enrolment (mig 015) — when the reward's sub allows it, show the
+         "Not enrolled yet? Enrol now" area beneath the redeem controls. */
+      if (body.allow_enrollment && $('enrol-area')) {
+        $('enrol-area').style.display = '';
+      }
       $('redeem-form').style.display = '';
     })
     .catch(() => showDead('Couldn’t reach server', 'Please check your connection and refresh the page.'));
@@ -952,6 +975,53 @@ function submitRedemption() {
     })
     .catch(() => {
       btn.disabled = false; btn.textContent = 'Redeem this reward';
+      showMessage('Network error — please try again.', 'err');
+    });
+}
+
+/* ── Self-enrolment at the rewards location (mig 015) ──────────────
+   Enrols the visitor against this reward's sub (source='location') and
+   awards them the reward they scanned, in one action. */
+function toggleEnrolForm(open) {
+  var p = $('enrol-prompt'), f = $('enrol-form');
+  if (!p || !f) return;
+  p.style.display = open ? 'none' : '';
+  f.style.display = open ? '' : 'none';
+  $('msg-host').innerHTML = '';
+  if (open) { var el = $('enrol-first'); if (el) el.focus(); }
+}
+
+function submitEnrolAtLocation() {
+  var btn = $('enrol-submit-btn');
+  var first  = ($('enrol-first').value  || '').trim();
+  var last   = ($('enrol-last').value   || '').trim();
+  var email  = ($('enrol-email').value  || '').trim().toLowerCase();
+  var email2 = ($('enrol-email2').value || '').trim().toLowerCase();
+  $('msg-host').innerHTML = '';
+  if (!first || !last) { showMessage('Please enter your first and last name.', 'err'); return; }
+  if (!email || email.indexOf('@') === -1) { showMessage('Please enter a valid email address.', 'err'); return; }
+  if (email !== email2) { showMessage('The two email addresses don’t match.', 'err'); return; }
+  btn.disabled = true; btn.textContent = 'Enrolling…';
+  fetch('/api/v1/enroll_at_location.php?t=' + encodeURIComponent(TOKEN), {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ first_name: first, last_name: last, email: email, email_confirm: email2 })
+  })
+    .then(r => r.json().then(j => ({ status: r.status, body: j })))
+    .then(({ status, body }) => {
+      btn.disabled = false; btn.textContent = 'Enrol & claim reward';
+      if (!body || !body.ok) {
+        showMessage((body && (body.message || body.error)) || 'We couldn’t complete your enrolment. Try again in a moment.', 'err');
+        return;
+      }
+      $('redeem-form').style.display = 'none';
+      $('success-summary').innerHTML =
+        (body.already_enrolled ? 'Welcome back! ' : 'You’re enrolled! ')
+        + '<strong>' + (body.points_awarded || 0) + ' point' + ((body.points_awarded || 0) === 1 ? '' : 's') + '</strong> awarded';
+      $('success-state').style.display = '';
+    })
+    .catch(() => {
+      btn.disabled = false; btn.textContent = 'Enrol & claim reward';
       showMessage('Network error — please try again.', 'err');
     });
 }
