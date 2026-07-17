@@ -25,6 +25,17 @@ require_once __DIR__ . '/../db.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
+/* 2026-07-17 — this response MUST NOT be cached. SiteGround's nginx proxy
+   (visible as `X-Proxy-Cache-Info: DT:1` on the response) was caching this GET
+   and replaying a stale result: three consecutive runs returned a
+   byte-identical {"applied":["010","011"]} while migrations 012 and 013 never
+   executed at all. Dangerous for a migration runner — it reports success for
+   work it did not do. The only tell was that a genuinely re-applied 010 would
+   have failed on a duplicate column, and nothing failed. */
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
+
 rewards_cron_auth_check();   /* 403 unless ?token=REWARDS_MIGRATE_TOKEN */
 
 try {
