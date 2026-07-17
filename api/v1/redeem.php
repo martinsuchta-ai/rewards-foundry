@@ -389,6 +389,35 @@ try {
         $wbmOrgName    = trim((string) (($checkRes['org']['name'] ?? '')));
     }
 
+    /* ── Enrolment status gate (migration 014) ─────────────────────
+       Block redemption when this person is suspended / unenrolled on
+       the sub. Auto-creates an ACTIVE `system` enrolment on the first
+       transaction (so a first-ever redemption is never blocked); an
+       admin suspend/unenrol blocks subsequent ones. Email is the
+       identity — resolve it (and the person's name) from the WBM
+       membership response when the redeemer used a key. Fail-open: no
+       email, table not yet migrated, or any error → redemption proceeds. */
+    require_once __DIR__ . '/../lib/enrollment.php';
+    $enrEmail = $email;
+    $enrFirst = null; $enrLast = null;
+    if (isset($wbmRespondent) && is_array($wbmRespondent)) {
+        if ($enrEmail === '') $enrEmail = strtolower(trim((string) ($wbmRespondent['email'] ?? '')));
+        $enrFirst = trim((string) ($wbmRespondent['first_name'] ?? $wbmRespondent['firstName'] ?? '')) ?: null;
+        $enrLast  = trim((string) ($wbmRespondent['last_name']  ?? $wbmRespondent['lastName']  ?? '')) ?: null;
+    }
+    if ($enrEmail !== '') {
+        $enr = rewards_enrollment_resolve(
+            $pdo, (string) $item['sub_id'], $enrEmail, $enrFirst, $enrLast, (int) $item['consumer_id']
+        );
+        if (!rewards_enrollment_may_redeem($enr['status'])) {
+            $enrMsg = ($enr['status'] === 'suspended')
+                ? 'Your rewards enrolment is currently suspended, so this reward can\'t be redeemed right now. Please contact your programme administrator.'
+                : 'You\'re no longer enrolled in this rewards programme, so this reward can\'t be redeemed. Please contact your programme administrator.';
+            rewards_json_err('enrolment_' . $enr['status'], 403, ['message' => $enrMsg]);
+            /* rewards_json_err exits — control doesn't return. */
+        }
+    }
+
     /* ── Insert audit row ──────────────────────────────────────── */
     $userAgent = isset($_SERVER['HTTP_USER_AGENT'])
         ? substr((string) $_SERVER['HTTP_USER_AGENT'], 0, 512)
