@@ -609,7 +609,8 @@
   function renderEnrollTable(rows, counts) {
     var host = document.getElementById('enr-list-host');
     var cap = function (s) { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); };
-    var summary = counts ? '<div style="padding:8px 14px;font-size:12px;color:var(--text-muted)">' + counts.total + ' total · ' + counts.source.system + ' system · ' + counts.source.manual + ' manual · ' + counts.status.active + ' active · ' + counts.status.suspended + ' suspended · ' + counts.status.unenrolled + ' unenrolled</div>' : '';
+    var srcLabel = function (s) { return s === 'location' ? 'At Rewards Location' : cap(s); };
+    var summary = counts ? '<div style="padding:8px 14px;font-size:12px;color:var(--text-muted)">' + counts.total + ' total · ' + counts.source.system + ' system · ' + counts.source.manual + ' manual · ' + ((counts.source.location || 0)) + ' at location · ' + counts.status.active + ' active · ' + counts.status.suspended + ' suspended · ' + counts.status.unenrolled + ' unenrolled</div>' : '';
     if (!rows.length) { host.innerHTML = summary + '<div style="padding:24px;text-align:center;color:var(--text-muted);font-style:italic">No enrolments match the filter.</div>'; return; }
     var body = rows.map(function (e) {
       var name = ((e.first_name || '') + ' ' + (e.last_name || '')).trim() || '—';
@@ -622,7 +623,7 @@
       } else {
         acts = '<button class="btn btn-sm" data-enr-act="' + id + '">Re-enrol</button>';
       }
-      return '<tr><td>' + RF.esc(name) + '</td><td>' + RF.esc(e.email || '') + '</td><td>' + RF.esc(cap(e.source)) + '</td><td>' + RF.esc(cap(e.status)) + '</td><td>' + acts + '</td></tr>';
+      return '<tr><td>' + RF.esc(name) + '</td><td>' + RF.esc(e.email || '') + '</td><td>' + RF.esc(srcLabel(e.source)) + '</td><td>' + RF.esc(cap(e.status)) + '</td><td>' + acts + '</td></tr>';
     }).join('');
     host.innerHTML = summary + '<table class="tbl"><thead><tr><th>Name</th><th>Email</th><th>Source</th><th>Status</th><th>Actions</th></tr></thead><tbody>' + body + '</tbody></table>';
     host.querySelectorAll('[data-enr-sus]').forEach(function (b) { b.addEventListener('click', function () { enrSetStatus(b.getAttribute('data-enr-sus'), 'suspended'); }); });

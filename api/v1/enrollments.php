@@ -76,7 +76,7 @@ if ($action === 'list') {
     $where = [$scopeWhere];
     $args  = [$subId, $cid];
     $src = strtolower(trim((string) ($_GET['source'] ?? '')));
-    if ($src === 'system' || $src === 'manual') { $where[] = '`source` = ?'; $args[] = $src; }
+    if (in_array($src, ['system', 'manual', 'location'], true)) { $where[] = '`source` = ?'; $args[] = $src; }
     $stt = strtolower(trim((string) ($_GET['status'] ?? '')));
     if (in_array($stt, ['active', 'suspended', 'unenrolled'], true)) { $where[] = '`status` = ?'; $args[] = $stt; }
     $q = trim((string) ($_GET['q'] ?? ''));
@@ -108,7 +108,7 @@ if ($action === 'list') {
               GROUP BY `source`, `status`"
         );
         $cst->execute([$subId, $cid]);
-        $counts = ['source' => ['system' => 0, 'manual' => 0],
+        $counts = ['source' => ['system' => 0, 'manual' => 0, 'location' => 0],
                    'status' => ['active' => 0, 'suspended' => 0, 'unenrolled' => 0],
                    'total'  => 0];
         foreach ($cst->fetchAll(PDO::FETCH_ASSOC) as $c) {
