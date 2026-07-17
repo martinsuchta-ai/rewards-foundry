@@ -168,6 +168,25 @@ foreach ($awards as $a) {
     }
 }
 
+/* ── 4. Auto-enrol the participant (migration 014) ──────────────────
+   A wearable earn IS a transaction, so ensure the person has an
+   enrolment on their rewards sub. sub_id + name come from the WBM sync
+   payload (WBM knows the rule→sub scope and the respondent's name — RF
+   holds neither). Touch only: earning is never gated (only redemption
+   is), so the returned status is ignored. Fail-open — no sub_id / table
+   not migrated / any error → skip silently, never fail the credit. */
+$enrSub = trim((string) ($payload['sub_id'] ?? ''));
+if ($enrSub !== '' && $email !== '') {
+    try {
+        require_once __DIR__ . '/../lib/enrollment.php';
+        rewards_enrollment_resolve(
+            $pdo, $enrSub, $email,
+            (trim((string) ($payload['first_name'] ?? '')) ?: null),
+            (trim((string) ($payload['last_name'] ?? '')) ?: null)
+        );
+    } catch (Throwable $_eEnr) { /* never fail the credit on enrolment */ }
+}
+
 echo json_encode([
     'ok'               => true,
     'awards_credited'  => $credited,
