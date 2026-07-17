@@ -285,6 +285,27 @@ try {
         rewards_safe_error_response($e, 'award insert failed');
     }
 
+    /* ── Auto-enrol the participant (migration 014) ──────────────────
+       A behaviour award IS a transaction, so ensure the student has an
+       enrolment on the sub. Email + name come from the participant email
+       or the WBM membership response (which resolves both even on
+       key-only scans). Touch only — earning is never gated (only
+       redemption is). Fail-open: no email / table not migrated / any
+       error → skip silently, never fail the award. */
+    $enrEmail = $pEmail;
+    $enrFirst = null; $enrLast = null;
+    if (is_array($wbmRespondent) && $wbmRespondent) {
+        if ($enrEmail === '') $enrEmail = strtolower(trim((string) ($wbmRespondent['email'] ?? '')));
+        $enrFirst = trim((string) ($wbmRespondent['first_name'] ?? $wbmRespondent['firstName'] ?? '')) ?: null;
+        $enrLast  = trim((string) ($wbmRespondent['last_name']  ?? $wbmRespondent['lastName']  ?? '')) ?: null;
+    }
+    if ($enrEmail !== '' && preg_match('/^SUB-[A-Za-z0-9]{1,32}$/', $subId)) {
+        try {
+            require_once __DIR__ . '/../lib/enrollment.php';
+            rewards_enrollment_resolve($pdo, $subId, $enrEmail, $enrFirst, $enrLast, (int) $bx['consumer_id']);
+        } catch (Throwable $_eEnr) { /* never fail the award on enrolment */ }
+    }
+
     /* ── Compute the participant's current CONFIRMED-only balance.
        Only meaningful when we have an email; KEY-only flows skip. */
     $balance = null;
