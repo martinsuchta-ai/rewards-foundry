@@ -21,6 +21,7 @@
 <div class="tabs">
   <button class="tab active" data-tab="items">Items</button>
   <button class="tab"        data-tab="redemptions">Redemptions</button>
+  <button class="tab"        data-tab="enrollments">Enrolments</button>
   <!-- 2026-06-26 — Schools Pilot Phase D. Behaviour catalogue admin
        + PENDING approval queue + bulk print. Gated to catalogues
        that exist; if no catalogues are seeded the tab still works
@@ -69,6 +70,27 @@
     <div class="panel">
       <div id="red-list-host">
         <div style="padding:16px;color:var(--text-muted);font-style:italic">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ENROLMENTS TAB (migration 014) ───────────────────────── -->
+  <div data-pane="enrollments" style="display:none">
+    <div class="filterbar">
+      <label>Sub ID</label>
+      <input  id="enr-f-sub" type="text" placeholder="SUB-XXX" style="width:180px">
+      <label>Source</label>
+      <select id="enr-f-source"><option value="">All</option><option value="system">System</option><option value="manual">Manual</option></select>
+      <label>Status</label>
+      <select id="enr-f-status"><option value="">All</option><option value="active">Active</option><option value="suspended">Suspended</option><option value="unenrolled">Unenrolled</option></select>
+      <input  id="enr-f-q" type="text" placeholder="name or email…" style="width:160px">
+      <button class="btn btn-sm"         id="enr-refresh">Refresh</button>
+      <span style="flex:1 1 auto"></span>
+      <button class="btn btn-primary btn-sm" id="enr-new">+ Enrol someone</button>
+    </div>
+    <div class="panel">
+      <div id="enr-list-host">
+        <div style="padding:16px;color:var(--text-muted);font-style:italic">Enter a Sub ID and click Refresh.</div>
       </div>
     </div>
   </div>
@@ -242,6 +264,24 @@
   </div>
 </div>
 
+<div class="modal-bg" id="enr-modal-bg">
+  <div class="modal">
+    <div class="modal-h">Enrol a person</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">Add someone to this rewards programme manually. Enter the email twice to avoid a typo — it’s the key the external system credits.</div>
+    <div class="form-grid">
+      <div class="form-row"><label>First name *</label><input id="enr-first" type="text" autocomplete="off"></div>
+      <div class="form-row"><label>Last name *</label><input id="enr-last" type="text" autocomplete="off"></div>
+      <div class="form-row full"><label>Email *</label><input id="enr-email" type="email" autocomplete="off"></div>
+      <div class="form-row full"><label>Confirm email *</label><input id="enr-email2" type="email" autocomplete="off" onpaste="return false"></div>
+    </div>
+    <div class="modal-actions">
+      <span style="flex:1 1 auto;color:var(--red);font-size:12px" id="enr-err"></span>
+      <button class="btn"             id="enr-cancel">Cancel</button>
+      <button class="btn btn-primary" id="enr-save">Enrol</button>
+    </div>
+  </div>
+</div>
+
 <script src="/admin/shell.js"></script>
 <script>
 (function () {
@@ -258,6 +298,7 @@
       });
       if (tab === 'items')       loadItems();
       if (tab === 'redemptions') loadRedemptions();
+      if (tab === 'enrollments') loadEnrollments();
       if (tab === 'consumers')   loadConsumers();
       if (tab === 'schools')     loadSchools();
     });
@@ -542,6 +583,92 @@
        cookie; the X-Admin-Session header isn't sent on plain link
        clicks but the cookie alone is enough for the admin gate. */
     window.location.href = '/api/admin/redemptions.php?action=csv&' + filterQs();
+  });
+
+  /* ── ENROLMENTS (migration 014) ───────────────────────────── */
+  function _enrSub() { return document.getElementById('enr-f-sub').value.trim(); }
+  function loadEnrollments() {
+    var host = document.getElementById('enr-list-host');
+    var sub = _enrSub();
+    if (!sub) { host.innerHTML = '<div style="padding:16px;color:var(--text-muted);font-style:italic">Enter a Sub ID and click Refresh.</div>'; return; }
+    host.innerHTML = '<div style="padding:16px;color:var(--text-muted);font-style:italic">Loading…</div>';
+    var qs = 'action=list&sub_id=' + encodeURIComponent(sub);
+    var src = document.getElementById('enr-f-source').value;
+    var stt = document.getElementById('enr-f-status').value;
+    var q   = document.getElementById('enr-f-q').value.trim();
+    if (src) qs += '&source=' + encodeURIComponent(src);
+    if (stt) qs += '&status=' + encodeURIComponent(stt);
+    if (q)   qs += '&q=' + encodeURIComponent(q);
+    RF.api('/api/admin/enrollments.php?' + qs).then(function (res) {
+      var b = res.body;
+      if (b && b.setup) { host.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted)"><b>Enrolments isn’t set up yet</b><br>' + RF.esc(b.fix || 'Run migration 014.') + '</div>'; return; }
+      if (!b || !b.ok) { host.innerHTML = '<div style="padding:24px;text-align:center;color:var(--red)">' + RF.esc((b && b.error) || ('HTTP ' + res.status)) + '</div>'; return; }
+      renderEnrollTable(b.enrollments || [], b.counts || null);
+    }).catch(function (e) { host.innerHTML = '<div style="padding:24px;text-align:center;color:var(--red)">Network error: ' + RF.esc(e.message) + '</div>'; });
+  }
+  function renderEnrollTable(rows, counts) {
+    var host = document.getElementById('enr-list-host');
+    var cap = function (s) { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); };
+    var summary = counts ? '<div style="padding:8px 14px;font-size:12px;color:var(--text-muted)">' + counts.total + ' total · ' + counts.source.system + ' system · ' + counts.source.manual + ' manual · ' + counts.status.active + ' active · ' + counts.status.suspended + ' suspended · ' + counts.status.unenrolled + ' unenrolled</div>' : '';
+    if (!rows.length) { host.innerHTML = summary + '<div style="padding:24px;text-align:center;color:var(--text-muted);font-style:italic">No enrolments match the filter.</div>'; return; }
+    var body = rows.map(function (e) {
+      var name = ((e.first_name || '') + ' ' + (e.last_name || '')).trim() || '—';
+      var id = e.id;
+      var acts;
+      if (e.status === 'active') {
+        acts = '<button class="btn btn-sm" data-enr-sus="' + id + '">Suspend</button> <button class="btn btn-sm" data-enr-un="' + id + '">Unenrol</button>';
+      } else if (e.status === 'suspended') {
+        acts = '<button class="btn btn-sm" data-enr-act="' + id + '">Reactivate</button> <button class="btn btn-sm" data-enr-un="' + id + '">Unenrol</button>';
+      } else {
+        acts = '<button class="btn btn-sm" data-enr-act="' + id + '">Re-enrol</button>';
+      }
+      return '<tr><td>' + RF.esc(name) + '</td><td>' + RF.esc(e.email || '') + '</td><td>' + RF.esc(cap(e.source)) + '</td><td>' + RF.esc(cap(e.status)) + '</td><td>' + acts + '</td></tr>';
+    }).join('');
+    host.innerHTML = summary + '<table class="tbl"><thead><tr><th>Name</th><th>Email</th><th>Source</th><th>Status</th><th>Actions</th></tr></thead><tbody>' + body + '</tbody></table>';
+    host.querySelectorAll('[data-enr-sus]').forEach(function (b) { b.addEventListener('click', function () { enrSetStatus(b.getAttribute('data-enr-sus'), 'suspended'); }); });
+    host.querySelectorAll('[data-enr-act]').forEach(function (b) { b.addEventListener('click', function () { enrSetStatus(b.getAttribute('data-enr-act'), 'active'); }); });
+    host.querySelectorAll('[data-enr-un]').forEach(function (b) { b.addEventListener('click', function () { if (confirm('Unenrol this person? They will no longer be able to redeem.')) enrSetStatus(b.getAttribute('data-enr-un'), 'unenrolled'); }); });
+  }
+  function enrSetStatus(id, status) {
+    RF.api('/api/admin/enrollments.php?action=set_status', { method: 'POST', body: JSON.stringify({ sub_id: _enrSub(), id: parseInt(id, 10), status: status }) })
+      .then(function (res) {
+        if (!res.body || !res.body.ok) { alert('Update failed: ' + ((res.body && res.body.error) || res.status)); return; }
+        loadEnrollments();
+      }).catch(function (e) { alert('Network error: ' + e.message); });
+  }
+  document.getElementById('enr-refresh').addEventListener('click', loadEnrollments);
+  document.getElementById('enr-f-q').addEventListener('keydown', function (e) { if (e.key === 'Enter') loadEnrollments(); });
+  document.getElementById('enr-f-source').addEventListener('change', loadEnrollments);
+  document.getElementById('enr-f-status').addEventListener('change', loadEnrollments);
+  document.getElementById('enr-new').addEventListener('click', function () {
+    if (!_enrSub()) { alert('Enter a Sub ID first — enrolments are scoped to a subscription.'); return; }
+    document.getElementById('enr-first').value = '';
+    document.getElementById('enr-last').value = '';
+    document.getElementById('enr-email').value = '';
+    document.getElementById('enr-email2').value = '';
+    document.getElementById('enr-err').textContent = '';
+    document.getElementById('enr-modal-bg').classList.add('open');
+    document.getElementById('enr-first').focus();
+  });
+  document.getElementById('enr-cancel').addEventListener('click', function () { document.getElementById('enr-modal-bg').classList.remove('open'); });
+  document.getElementById('enr-save').addEventListener('click', function () {
+    var first = document.getElementById('enr-first').value.trim();
+    var last = document.getElementById('enr-last').value.trim();
+    var email = document.getElementById('enr-email').value.trim().toLowerCase();
+    var email2 = document.getElementById('enr-email2').value.trim().toLowerCase();
+    var err = document.getElementById('enr-err');
+    if (!first || !last) { err.textContent = 'First and last name are required.'; return; }
+    if (!email || email.indexOf('@') === -1) { err.textContent = 'A valid email is required.'; return; }
+    if (email !== email2) { err.textContent = 'The two email addresses don’t match.'; return; }
+    err.textContent = '';
+    var btn = document.getElementById('enr-save'); btn.disabled = true;
+    RF.api('/api/admin/enrollments.php?action=enroll', { method: 'POST', body: JSON.stringify({ sub_id: _enrSub(), first_name: first, last_name: last, email: email, email_confirm: email2 }) })
+      .then(function (res) {
+        btn.disabled = false;
+        if (!res.body || !res.body.ok) { err.textContent = (res.body && res.body.error) || ('HTTP ' + res.status); return; }
+        document.getElementById('enr-modal-bg').classList.remove('open');
+        loadEnrollments();
+      }).catch(function (e) { btn.disabled = false; err.textContent = 'Network error: ' + e.message; });
   });
 
   /* ── CONSUMERS ────────────────────────────────────────────── */
